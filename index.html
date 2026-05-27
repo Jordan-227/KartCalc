@@ -1098,7 +1098,7 @@ function renderWeather(data, place) {
 
     <div class="grid cols-4">
       <div class="metric"><div class="k">Humidity</div><div class="v">${Math.round(cur.relative_humidity_2m)}<small>%</small></div></div>
-      <div class="metric"><div class="k">Pressure</div><div class="v">${round1(cur.surface_pressure)}<small> hPa</small></div></div>
+      <div class="metric"><div class="k">Pressure</div><div class="v">${(cur.surface_pressure * 0.0145037738).toFixed(2)}<small> psi</small></div></div>
       <div class="metric"><div class="k">Wind</div><div class="v">${Math.round(cur.wind_speed_10m)}<small> km/h</small></div></div>
       <div class="metric"><div class="k">Grip estimate</div><div class="v">${gripLabel(gi)}</div><div class="note">from temp &amp; weather</div></div>
     </div>
