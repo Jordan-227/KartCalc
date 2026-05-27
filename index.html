@@ -245,6 +245,13 @@
           <button class="btn secondary" id="geoBtn">📡 My location</button>
         </div>
       </div>
+      <div class="field" style="margin-top:14px;">
+        <label for="trackSelect">Or pick a known circuit</label>
+        <select id="trackSelect">
+          <option value="">— Browse kart tracks —</option>
+        </select>
+        <div class="hint">Built-in directory of kart circuits worldwide — selecting one loads its local weather.</div>
+      </div>
       <div id="geoResults" style="margin-top:10px;"></div>
     </div>
 
@@ -447,6 +454,321 @@ function toast(msg) {
   t.textContent = msg; t.classList.add('show');
   clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1800);
 }
+
+/* ---------------- Built-in track directory ----------------
+   A starting list of kart circuits — comprehensive Karting Australia club
+   coverage plus the major international circuits. Each entry carries a
+   geocodable town so picking a track loads that track's local weather.
+   It's a curated list, not an exhaustive registry of every track on earth
+   (none exists) — add your own with KART_TRACKS.push({ name, town, region, cc, admin1 }). */
+const KART_TRACKS = (() => {
+  const T = [];
+  // list rows are [name, town, admin1Override?]; admin1Override lets one entry
+  // sit in a different state/region than the group default (e.g. Canberra).
+  const add = (region, cc, admin1, list) =>
+    list.forEach(e => T.push({ name: e[0], town: e[1], region, cc, admin1: e[2] || admin1 }));
+
+  /* ---- Australia (Karting Australia affiliated clubs) ---- */
+  add('Australia — Queensland', 'AU', 'Queensland', [
+    ['Ipswich Kart Club', 'Ipswich'],
+    ['Bundaberg Kart Club', 'Bundaberg'],
+    ['Warwick Kart Club', 'Warwick'],
+    ['Toowoomba & Lockyer Valley Kart Club', 'Toowoomba'],
+    ['Cairns Kart Club', 'Cairns'],
+    ['Cap Coast Kart Club', 'Yeppoon'],
+    ['Cooloola Coast Kart Club', 'Gympie'],
+    ['Emerald Kart Club', 'Emerald'],
+    ['Gladstone Kart Club', 'Gladstone'],
+    ['Gold Coast Kart Club', 'Gold Coast'],
+    ['Townsville Kart Club', 'Townsville'],
+    ['Whitsunday Motorsport Club', 'Proserpine'],
+  ]);
+  add('Australia — New South Wales & ACT', 'AU', 'New South Wales', [
+    ['Sydney Illawarra Kart Club', 'Eastern Creek'],
+    ['Greater Sydney Kart Club', 'Wilberforce'],
+    ['Combined Districts Kart Club', 'Lithgow'],
+    ['Newcastle Kart Racing Club', 'Newcastle'],
+    ['Manning Valley Kart Club', 'Wingham'],
+    ['Port Macquarie Kart Racing Club', 'Port Macquarie'],
+    ['Coffs Harbour Kart Racing Club', 'Coffs Harbour'],
+    ['Lismore Kart Club', 'Lismore'],
+    ['Tamworth Kart Racing Club', 'Tamworth'],
+    ['Gunnedah Kart Club', 'Gunnedah'],
+    ['Dubbo Kart Club', 'Dubbo'],
+    ['Orange Kart Club', 'Orange'],
+    ['Bathurst Kart Club', 'Bathurst'],
+    ['Grenfell Kart Club', 'Grenfell'],
+    ['Griffith Kart Club', 'Griffith'],
+    ['Wagga & District Kart Racing Club', 'Wagga Wagga'],
+    ['Sapphire Coast Kart Club', 'Bega'],
+    ['Broken Hill Kart Club', 'Broken Hill'],
+    ['Canberra Kart Racing Club', 'Canberra', 'Australian Capital Territory'],
+  ]);
+  add('Australia — Victoria', 'AU', 'Victoria', [
+    ['Go-Kart Club of Victoria (Todd Road)', 'Port Melbourne'],
+    ['Oakleigh Kart Club', 'Oakleigh'],
+    ['Albury-Wodonga Kart Club', 'Wodonga'],
+    ['Bairnsdale Kart Club', 'Bairnsdale'],
+    ['Ballarat Kart Club', 'Ballarat'],
+    ['Bendigo Kart Club', 'Bendigo'],
+    ['Eastern Lions Kart Club', 'Seymour'],
+    ['Gippsland Go-Kart Club', 'Morwell'],
+    ['Goulburn Valley Kart Club', 'Numurkah'],
+    ['Hamilton Kart Club', 'Hamilton'],
+    ['Mildura Kart Club', 'Mildura'],
+    ['Portland District Karting Club', 'Portland'],
+    ['Rochester Kart Club', 'Rochester'],
+    ['South West Kart Club', 'Cobden'],
+    ['Swan Hill Kart Club', 'Swan Hill'],
+    ['Warrnambool Kart Club', 'Warrnambool'],
+    ['Wimmera Kart Racing Club', 'Horsham'],
+  ]);
+  add('Australia — South Australia', 'AU', 'South Australia', [
+    ['Go Kart Club of SA (Monarto)', 'Monarto'],
+    ['Southern Go Kart Club', 'Bolivar'],
+    ['Barossa Go Kart Club', 'Nuriootpa'],
+    ['Mount Gambier Kart Club', 'Mount Gambier'],
+    ['Whyalla Go Kart Club', 'Whyalla'],
+  ]);
+  add('Australia — Western Australia', 'AU', 'Western Australia', [
+    ['Tiger Kart Club', 'Cockburn'],
+    ['Albany City Kart Club', 'Albany'],
+    ['Bunbury City Kart Club', 'Bunbury'],
+    ['Eastern Goldfields Kart Club', 'Kalgoorlie'],
+    ['Esperance Kart Klub', 'Esperance'],
+    ['Exmouth Kart Club', 'Exmouth'],
+    ['Hedland Kart Club', 'Port Hedland'],
+    ['Hurricane Go Kart Club', 'Wundowie'],
+    ['Impala Kart Club', 'Tom Price'],
+    ['Karratha Kart Club', 'Karratha'],
+    ['Lake King Kart Club', 'Lake King'],
+    ['Midwest Kart Club', 'Geraldton'],
+  ]);
+  add('Australia — Tasmania', 'AU', 'Tasmania', [
+    ['Launceston Kart Club', 'Launceston'],
+    ['North Western Kart Club', 'Burnie'],
+    ['Southern Tasmanian Kart Club', 'Hobart'],
+    ['Circular Head Kart Club', 'Smithton'],
+  ]);
+  add('Australia — Northern Territory', 'AU', 'Northern Territory', [
+    ['Darwin Kart Club', 'Darwin'],
+    ['Alice Springs Kart Club', 'Alice Springs'],
+  ]);
+
+  /* ---- United Kingdom & Ireland ---- */
+  add('UK & Ireland', 'GB', '', [
+    ['PF International (PFi)', 'Grantham'],
+    ['Whilton Mill', 'Daventry'],
+    ['Shenington Kart Racing Club', 'Banbury'],
+    ['Buckmore Park', 'Chatham'],
+    ['Clay Pigeon Raceway', 'Dorchester'],
+    ['Llandow Kart Circuit', 'Cowbridge'],
+    ['Rissington Kart Club', 'Bourton-on-the-Water'],
+    ['Larkhall Kart Circuit', 'Larkhall'],
+    ['Kimbolton Kart Club', 'Kimbolton'],
+    ['Fulbeck Kart Club', 'Fulbeck'],
+    ['Forest Edge Kart Club', 'Ringwood'],
+    ['Glan-y-Gors (GYG)', 'Ruthin'],
+    ['Three Sisters Race Circuit', 'Wigan'],
+    ['Rye House Kart Raceway', 'Hoddesdon'],
+    ['Camberley Kart Club (Blackbushe)', 'Camberley'],
+    ['Rowrah Kart Circuit', 'Rowrah'],
+    ['Tattershall Kart Circuit', 'Tattershall'],
+    ['Ellough Park', 'Beccles'],
+    ['Nutts Corner (Mount Kart Circuit)', 'Crumlin', 'Northern Ireland'],
+  ]);
+  add('Ireland', 'IE', '', [
+    ['Athboy Kart Circuit', 'Athboy'],
+    ['Watergrasshill Kart Club', 'Cork'],
+  ]);
+
+  /* ---- Europe ---- */
+  add('Italy', 'IT', '', [
+    ['South Garda Karting', 'Lonato'],
+    ['Circuito Internazionale Napoli', 'Sarno'],
+    ['Adria Karting Raceway', 'Adria'],
+    ['Franciacorta Karting Track', 'Castrezzato'],
+    ['7 Laghi Kart', 'Castelletto di Branduzzo'],
+    ['World Circuit La Conca', 'Muro Leccese'],
+    ['Leopard Circuit (Viterbo)', 'Viterbo'],
+    ['Cremona Circuit', 'Cremona'],
+    ['Circuito di Siena', 'Siena'],
+  ]);
+  add('France', 'FR', '', [
+    ['Le Mans Karting International', 'Le Mans'],
+    ['Circuit de Salbris (RKC)', 'Salbris'],
+    ['Circuit Paul Armagnac (Nogaro)', 'Nogaro'],
+    ['Angerville', 'Angerville'],
+    ['Aunay-les-Bois', 'Aunay-les-Bois'],
+    ['Varennes-sur-Allier', 'Varennes-sur-Allier'],
+    ['Ostricourt', 'Ostricourt'],
+    ['Brignoles', 'Brignoles'],
+    ['Mirecourt', 'Mirecourt'],
+  ]);
+  add('Spain & Portugal', 'ES', '', [
+    ['Circuito Internacional de Zuera', 'Zuera'],
+    ['Circuito Lucas Guerrero (Chiva)', 'Chiva'],
+    ['Karting Campillos', 'Campillos'],
+    ['Circuit Recardau (Vendrell)', 'El Vendrell'],
+  ]);
+  add('Spain & Portugal', 'PT', '', [
+    ['Kartódromo Internacional do Algarve', 'Portimão'],
+    ['Kartódromo de Palmela', 'Palmela'],
+  ]);
+  add('Germany', 'DE', '', [
+    ['ProKart Raceland Wackersdorf', 'Wackersdorf'],
+    ['Motorsport Arena Mülsen', 'Mülsen'],
+    ['Erftlandring Kerpen', 'Kerpen'],
+    ['Kartbahn Ampfing', 'Ampfing'],
+    ['Liedolsheim', 'Dettenheim'],
+    ['Oppenrod', 'Buseck'],
+  ]);
+  add('Belgium & Netherlands', 'BE', '', [
+    ['Karting Genk', 'Genk'],
+    ['Karting des Fagnes', 'Mariembourg'],
+    ['Karting Club Roeselare (Bavikhove)', 'Harelbeke'],
+  ]);
+  add('Belgium & Netherlands', 'NL', '', [
+    ['Karting Eindhoven (De Landsard)', 'Eindhoven'],
+    ['Kart Circuit Berghem', 'Berghem'],
+  ]);
+  add('Scandinavia', 'SE', '', [
+    ['Asum Ring', 'Kristianstad'],
+    ['Falkenberg Kart', 'Falkenberg'],
+    ['NXT Level Ring (Mariefred)', 'Mariefred'],
+  ]);
+  add('Scandinavia', 'DK', '', [['Vojens Karting', 'Vojens']]);
+  add('Scandinavia', 'NO', '', [['NMK Sørmarka', 'Stavanger']]);
+  add('Scandinavia', 'FI', '', [['PowerPark Karting', 'Alahärmä']]);
+  add('Central & Eastern Europe', 'CZ', '', [
+    ['Autodrom Sosnová', 'Sosnová'],
+    ['Kart Arena Třinec (Čtyři Mosty)', 'Třinec'],
+  ]);
+  add('Central & Eastern Europe', 'RS', '', [['Hangar Pančevo', 'Pančevo']]);
+  add('Central & Eastern Europe', 'AT', '', [['Prokart Litzelsdorf', 'Litzelsdorf']]);
+
+  /* ---- Middle East ---- */
+  add('Middle East', 'BH', '', [['Bahrain International Kart Circuit', 'Sakhir']]);
+  add('Middle East', 'AE', '', [
+    ['Dubai Kartdrome', 'Dubai'],
+    ['Al Ain Raceway', 'Al Ain'],
+    ['Yas Kartzone', 'Abu Dhabi'],
+  ]);
+
+  /* ---- North America ---- */
+  add('United States', 'US', '', [
+    ['New Castle Motorsports Park', 'New Castle', 'Indiana'],
+    ['GoPro Motorplex', 'Mooresville', 'North Carolina'],
+    ['NOLA Motorsports Park', 'New Orleans', 'Louisiana'],
+    ['Badger Kart Club', 'Dousman', 'Wisconsin'],
+    ['Pittsburgh Int\'l Race Complex', 'Wampum', 'Pennsylvania'],
+    ['SuperNationals (Las Vegas)', 'Las Vegas', 'Nevada'],
+    ['Sonoma Raceway Karting', 'Sonoma', 'California'],
+    ['AMR Homestead-Miami Karting', 'Homestead', 'Florida'],
+    ['Orlando Kart Center', 'Orlando', 'Florida'],
+    ['Andersen RacePark', 'Palmetto', 'Florida'],
+    ['SpeedSportz Racing Park', 'New Caney', 'Texas'],
+    ['Dallas Karting Complex', 'Caddo Mills', 'Texas'],
+  ]);
+  add('Canada', 'CA', '', [
+    ['Goodwood Kartways', 'Uxbridge', 'Ontario'],
+    ['Mosport Kartways', 'Bowmanville', 'Ontario'],
+    ['Jim Russell Karting (Mont-Tremblant)', 'Mont-Tremblant', 'Quebec'],
+    ['SH Karting', 'Mont-Saint-Hilaire', 'Quebec'],
+    ['Pat\'s Kartways', 'Surrey', 'British Columbia'],
+  ]);
+
+  /* ---- South America ---- */
+  add('Brazil', 'BR', '', [
+    ['Kartódromo Ayrton Senna (Interlagos)', 'São Paulo'],
+    ['Kartódromo Granja Viana', 'Cotia'],
+    ['Kartódromo Beto Carrero', 'Penha'],
+  ]);
+  add('Argentina', 'AR', '', [
+    ['Kartódromo de Zárate', 'Zárate'],
+    ['Kartódromo Ciudad de La Plata', 'La Plata'],
+    ['Kartódromo de Junín', 'Junín'],
+  ]);
+
+  /* ---- Asia ---- */
+  add('Japan', 'JP', '', [
+    ['Suzuka Circuit Kart Course', 'Suzuka'],
+    ['Mobility Resort Motegi', 'Motegi'],
+    ['Mobara Twin Circuit', 'Mobara'],
+    ['New Tokyo Circuit', 'Tako'],
+    ['City Kart (Ena)', 'Ena'],
+  ]);
+  add('Asia — Other', 'MY', '', [['Sepang International Kart Circuit', 'Sepang']]);
+  add('Asia — Other', 'CN', '', [['Zhuhai International Karting Circuit', 'Zhuhai']]);
+  add('Asia — Other', 'MO', '', [['Coloane Karting Track', 'Macau']]);
+  add('Asia — Other', 'IN', '', [
+    ['Kari Motor Speedway', 'Coimbatore'],
+    ['Meco Kartopia', 'Bengaluru'],
+  ]);
+
+  /* ---- New Zealand ---- */
+  add('New Zealand', 'NZ', '', [
+    ['KartSport Hamilton', 'Hamilton'],
+    ['KartSport Rotorua', 'Rotorua'],
+    ['KartSport Canterbury (Wigram)', 'Christchurch'],
+    ['KartSport Wellington (Kaitoke)', 'Upper Hutt'],
+    ['KartSport Auckland', 'Auckland'],
+    ['KartSport Hawke\'s Bay', 'Hastings'],
+    ['KartSport Marlborough', 'Blenheim'],
+  ]);
+
+  return T;
+})();
+
+/* All track names (built-in + your logged tracks), de-duped and sorted. */
+function allTrackNames() {
+  const names = [...KART_TRACKS.map(t => t.name), ...sessions.map(s => s.track).filter(Boolean)];
+  return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+}
+/* Autocomplete used by the Log and Recommendation track inputs. */
+function populateTrackList() {
+  const dl = document.getElementById('trackList');
+  if (dl) dl.innerHTML = allTrackNames().map(t => `<option value="${escapeHtml(t)}">`).join('');
+}
+/* The dashboard "Browse kart tracks" dropdown, grouped by region. */
+function populateTrackSelect() {
+  const sel = document.getElementById('trackSelect');
+  if (!sel) return;
+  let html = '<option value="">— Browse kart tracks —</option>';
+  let region = null;
+  KART_TRACKS.forEach((t, i) => {
+    if (t.region !== region) {
+      if (region !== null) html += '</optgroup>';
+      html += `<optgroup label="${escapeHtml(t.region)}">`;
+      region = t.region;
+    }
+    html += `<option value="${i}">${escapeHtml(t.name)}</option>`;
+  });
+  if (region !== null) html += '</optgroup>';
+  sel.innerHTML = html;
+}
+/* Resolve a directory track to a location and load its weather. */
+window.pickTrack = async function (i) {
+  const t = KART_TRACKS[i];
+  if (!t) return;
+  const box = document.getElementById('geoResults');
+  box.innerHTML = '<span class="note">Loading weather…</span>';
+  try {
+    const results = await geocode(t.town);
+    let cand = results;
+    if (t.cc) { const f = cand.filter(r => r.country_code === t.cc); if (f.length) cand = f; }
+    if (t.admin1) { const f = cand.filter(r => (r.admin1 || '').toLowerCase().includes(t.admin1.toLowerCase())); if (f.length) cand = f; }
+    const r = cand[0];
+    if (!r) { box.innerHTML = '<span class="note" style="color:var(--bad)">Couldn\'t locate this track\'s weather — try the search box above.</span>'; return; }
+    settings.location = { lat: r.latitude, lon: r.longitude, name: t.name };
+    document.getElementById('cityInput').value = t.name;
+    await refreshWeather();
+    box.innerHTML = '';
+    save();
+  } catch (e) {
+    box.innerHTML = '<span class="note" style="color:var(--bad)">Search failed — check your connection.</span>';
+  }
+};
 
 /* ---------------- Weather codes (WMO) ---------------- */
 const WMO = {
@@ -845,9 +1167,8 @@ function renderHistory() {
       <td><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="event.stopPropagation();deleteSession('${s.id}')">✕</button></td>
     </tr>`).join('');
 
-  // refresh datalists of track names
-  const tracks = [...new Set(sessions.map(s => s.track).filter(Boolean))];
-  document.getElementById('trackList').innerHTML = tracks.map(t => `<option value="${escapeHtml(t)}">`).join('');
+  // refresh the track autocomplete (built-in directory + your logged tracks)
+  populateTrackList();
 }
 
 /* ---------------- Form <-> session ---------------- */
@@ -899,6 +1220,12 @@ async function doSearch() {
   } catch (e) { box.innerHTML = '<span class="note" style="color:var(--bad)">Search failed — check your connection.</span>'; }
 }
 function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
+
+// pick a track from the built-in directory dropdown
+document.getElementById('trackSelect').addEventListener('change', e => {
+  const i = e.target.value;
+  if (i !== '') { pickTrack(parseInt(i, 10)); e.target.value = ''; }
+});
 
 window.pickPlace = async function (lat, lon, label) {
   document.getElementById('geoResults').innerHTML = '<span class="note">Loading weather…</span>';
@@ -1050,6 +1377,7 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
 (function init() {
   // default date = today
   document.getElementById('logForm').date.value = new Date().toISOString().slice(0, 10);
+  populateTrackSelect();
   renderHistory();
   if (settings.location) {
     document.getElementById('cityInput').value = settings.location.name || '';
