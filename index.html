@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KartCalc — Go-Kart Setup & Conditions Tracker</title>
+<style>
+  /* ---------- Theme ---------- */
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2230;
+    --border: #2a3140;
+    --text: #e6edf3;
+    --muted: #9aa7b5;
+    --accent: #ff5c00;       /* racing orange */
+    --accent-2: #00d4ff;     /* telemetry cyan */
+    --good: #3fb950;
+    --warn: #d29922;
+    --bad: #f85149;
+    --radius: 12px;
+    --shadow: 0 6px 24px rgba(0,0,0,0.35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(1200px 600px at 80% -10%, #1a2030 0%, var(--bg) 60%);
+    color: var(--text);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent-2); }
+
+  /* ---------- Header ---------- */
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(255,92,0,0.06), transparent);
+  }
+  .logo {
+    font-weight: 800; font-size: 22px; letter-spacing: -0.5px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo .mark {
+    background: var(--accent); color: #fff; border-radius: 8px;
+    padding: 4px 8px; font-size: 16px; box-shadow: var(--shadow);
+  }
+  .logo small { color: var(--muted); font-weight: 500; font-size: 12px; }
+  header .spacer { flex: 1; }
+
+  /* ---------- Nav ---------- */
+  nav {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    padding: 10px 22px; border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    position: sticky; top: 0; z-index: 20;
+  }
+  nav button {
+    background: transparent; color: var(--muted);
+    border: 1px solid transparent; border-radius: 999px;
+    padding: 8px 16px; cursor: pointer; font-size: 14px; font-weight: 600;
+    transition: all .15s ease;
+  }
+  nav button:hover { color: var(--text); background: var(--panel-2); }
+  nav button.active { color: #fff; background: var(--accent); }
+
+  /* ---------- Layout ---------- */
+  main { padding: 22px; max-width: 1100px; margin: 0 auto; }
+  section.view { display: none; animation: fade .2s ease; }
+  section.view.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px);} to {opacity:1; transform:none;} }
+  h2 { margin: 0 0 4px; font-size: 20px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .card h3 { margin: 0 0 12px; font-size: 15px; color: var(--text); display:flex; align-items:center; gap:8px;}
+  .grid { display: grid; gap: 14px; }
+  .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 720px) {
+    .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 480px) {
+    .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: 1fr; }
+    nav { padding: 10px 12px; } main { padding: 14px; }
+  }
+
+  /* ---------- Forms ---------- */
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+  input, select, textarea {
+    width: 100%; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+    font-size: 14px; font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-2); }
+  textarea { resize: vertical; min-height: 64px; }
+  .field { margin-bottom: 0; }
+  .field .hint { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+  button.btn {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 11px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
+    transition: filter .15s ease;
+  }
+  button.btn:hover { filter: brightness(1.1); }
+  button.btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.btn.ghost { background: transparent; color: var(--accent-2); border: 1px solid var(--border); }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+
+  /* ---------- Weather / metrics ---------- */
+  .metric { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .metric .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .metric .v { font-size: 26px; font-weight: 800; margin-top: 2px; }
+  .metric .v small { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .metric .note { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .bigweather { display:flex; align-items:center; gap:18px; flex-wrap: wrap; }
+  .bigweather .emoji { font-size: 56px; line-height: 1; }
+  .bigweather .temp { font-size: 44px; font-weight: 800; }
+  .bigweather .desc { color: var(--muted); }
+
+  /* density bar */
+  .bar { height: 10px; background: var(--panel-2); border-radius: 999px; overflow: hidden; border:1px solid var(--border); }
+  .bar > i { display:block; height:100%; background: linear-gradient(90deg, var(--bad), var(--warn), var(--good)); }
+
+  /* ---------- Warnings / agenda ---------- */
+  .agenda { display: flex; flex-direction: column; gap: 8px; }
+  .event { display:flex; gap: 12px; align-items:flex-start; padding: 10px 12px; border-radius: 8px; background: var(--panel-2); border-left: 3px solid var(--muted); }
+  .event.warn { border-left-color: var(--warn); }
+  .event.bad { border-left-color: var(--bad); }
+  .event.good { border-left-color: var(--good); }
+  .event.info { border-left-color: var(--accent-2); }
+  .event .time { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 52px; }
+  .event .msg { font-size: 14px; }
+  .event .ico { font-size: 18px; }
+  .headline { font-size: 15px; padding: 12px 14px; border-radius: 8px; background: linear-gradient(90deg, rgba(255,92,0,.12), transparent); border: 1px solid var(--border); }
+
+  /* ---------- Tables ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; position: sticky; top: 0; }
+  tr:hover td { background: var(--panel-2); }
+  .table-wrap { overflow-x: auto; }
+  .tag { display:inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .tag.dry { background: rgba(255,92,0,.15); color: #ffb07a; }
+  .tag.damp { background: rgba(0,212,255,.15); color: #8fe6ff; }
+  .tag.wet { background: rgba(63,185,80,.12); color: #8be29a; }
+  .pill { font-size:11px; padding:2px 8px; border:1px solid var(--border); border-radius:999px; color:var(--muted); }
+
+  /* ---------- Recommendations ---------- */
+  .rec { padding: 12px 14px; border-radius: 8px; background: var(--panel-2); border:1px solid var(--border); margin-bottom: 10px; }
+  .rec .rec-h { font-weight: 800; margin-bottom: 6px; display:flex; align-items:center; gap:8px; }
+  .rec ul { margin: 6px 0 0; padding-left: 20px; }
+  .rec li { margin: 4px 0; }
+  .delta-up { color: var(--good); font-weight: 700; }
+  .delta-down { color: var(--accent-2); font-weight: 700; }
+  .caveat { font-size: 12px; color: var(--muted); border: 1px dashed var(--border); border-radius: 8px; padding: 10px 12px; background: rgba(210,153,34,.05); }
+
+  .empty { text-align:center; color: var(--muted); padding: 30px; font-size: 14px; }
+  .row-between { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap: wrap; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--good); color:#04210b; padding: 10px 18px; border-radius: 999px; font-weight: 700; box-shadow: var(--shadow); opacity: 0; pointer-events:none; transition: opacity .2s; z-index: 50; }
+  .toast.show { opacity: 1; }
+  footer { text-align:center; color: var(--muted); font-size: 12px; padding: 24px; }
+  .legend { font-size: 12px; color: var(--muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <span class="mark">KC</span>
+    <div>KartCalc <small>setup &amp; conditions tracker</small></div>
+  </div>
+  <div class="spacer"></div>
+  <span class="pill" id="locPill">No location set</span>
+</header>
+
+<nav>
+  <button data-view="dashboard" class="active">🌤️ Conditions</button>
+  <button data-view="log">📝 Log Session</button>
+  <button data-view="history">📚 History</button>
+  <button data-view="recommend">🧠 Recommendations</button>
+  <button data-view="data">💾 Data</button>
+</nav>
+
+<main>
+
+  <!-- ===================== DASHBOARD ===================== -->
+  <section class="view active" id="dashboard">
+    <h2>Track Conditions</h2>
+    <p class="sub">Live weather, air density ("air thickness") and a day-ahead warnings calendar for your circuit.</p>
+
+    <div class="card">
+      <h3>📍 Location</h3>
+      <div class="grid cols-3">
+        <div class="field" style="grid-column: span 2;">
+          <label for="cityInput">Circuit / town</label>
+          <input id="cityInput" placeholder="e.g. PFI Grantham, Las Vegas, Genk…" />
+          <div class="hint">Type a place and press Search, or use your device location.</div>
+        </div>
+        <div class="field" style="display:flex; align-items:flex-end; gap:8px;">
+          <button class="btn" id="searchBtn">Search</button>
+          <button class="btn secondary" id="geoBtn">📡 My location</button>
+        </div>
+      </div>
+      <div id="geoResults" style="margin-top:10px;"></div>
+    </div>
+
+    <div id="weatherArea"></div>
+  </section>
+
+  <!-- ===================== LOG SESSION ===================== -->
+  <section class="view" id="log">
+    <h2>Log a Session</h2>
+    <p class="sub">Record the chassis setup, the conditions and how the kart performed. The more you log, the smarter the recommendations get.</p>
+
+    <form id="logForm">
+      <div class="card">
+        <h3>🏁 Session</h3>
+        <div class="grid cols-4">
+          <div class="field"><label>Date</label><input type="date" name="date" required></div>
+          <div class="field" style="grid-column: span 2;"><label>Track</label><input name="track" list="trackList" placeholder="Circuit name" required></div>
+          <div class="field"><label>Class / Kart</label><input name="kart" placeholder="e.g. Rotax Senior"></div>
+        </div>
+        <datalist id="trackList"></datalist>
+      </div>
+
+      <div class="card">
+        <h3>🔧 Chassis Setup</h3>
+        <div class="grid cols-4">
+          <div class="field"><label>Front camber (°)</label><input type="number" step="0.1" name="camberFront" placeholder="-1.0"></div>
+          <div class="field"><label>Caster</label>
+            <select name="caster"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
+          <div class="field"><label>Front track (mm)</label><input type="number" step="1" name="frontTrack" placeholder="1250"></div>
+          <div class="field"><label>Rear track (mm)</label><input type="number" step="1" name="rearTrack" placeholder="1400"></div>
+
+          <div class="field"><label>Axle hardness</label>
+            <select name="axle"><option value="">—</option><option>Soft</option><option>Medium</option><option>Hard</option></select></div>
+          <div class="field"><label>Front ride height</label>
+            <select name="rideFront"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
+          <div class="field"><label>Rear ride height</label>
+            <select name="rideRear"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
+          <div class="field"><label>Seat position</label>
+            <select name="seat"><option value="">—</option><option>Forward</option><option>Standard</option><option>Back</option><option>Lower</option><option>Higher</option></select></div>
+
+          <div class="field"><label>Tyre press. front (psi)</label><input type="number" step="0.1" name="tyreFront" placeholder="11.0"></div>
+          <div class="field"><label>Tyre press. rear (psi)</label><input type="number" step="0.1" name="tyreRear" placeholder="11.0"></div>
+          <div class="field"><label>Tyre compound</label><input name="compound" placeholder="e.g. MOJO D5"></div>
+          <div class="field"><label>Gearing</label><input name="gear" placeholder="e.g. 11 / 82"></div>
+
+          <div class="field"><label>Main jet</label><input name="mainJet" placeholder="e.g. 118"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🌡️ Conditions
+          <button type="button" class="btn ghost" id="useTodayBtn" style="margin-left:auto; font-size:12px; padding:6px 12px;">↧ Use today's live conditions</button>
+        </h3>
+        <div class="grid cols-4">
+          <div class="field"><label>Weather</label>
+            <select name="weather"><option>Dry</option><option>Damp</option><option>Wet</option></select></div>
+          <div class="field"><label>Air temp (°C)</label><input type="number" step="0.1" name="airTemp"></div>
+          <div class="field"><label>Track temp (°C)</label><input type="number" step="0.1" name="trackTemp"></div>
+          <div class="field"><label>Humidity (%)</label><input type="number" step="1" name="humidity"></div>
+          <div class="field"><label>Pressure (hPa)</label><input type="number" step="0.1" name="pressure"></div>
+          <div class="field"><label>Air density (kg/m³)</label><input type="number" step="0.001" name="airDensity" placeholder="auto"></div>
+          <div class="field"><label>Rel. density (%)</label><input type="number" step="0.1" name="relDensity" placeholder="auto"></div>
+          <div class="field"><label>Grip level</label>
+            <select name="grip"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>⏱️ Performance</h3>
+        <div class="grid cols-4">
+          <div class="field"><label>Best lap</label><input name="bestLap" placeholder="45.231 or 1:02.4"></div>
+          <div class="field"><label>Avg lap</label><input name="avgLap" placeholder="optional"></div>
+          <div class="field"><label>Balance / feel</label>
+            <select name="feel"><option value="">—</option><option>Understeer</option><option>Balanced</option><option>Oversteer / loose</option><option>Hopping</option><option>Snappy</option></select></div>
+          <div class="field"><label>Speed rating</label>
+            <select name="speed"><option value="">—</option><option>Down on pace</option><option>On pace</option><option>Quick / PB</option></select></div>
+        </div>
+        <div class="field" style="margin-top:14px;"><label>Notes</label><textarea name="notes" placeholder="What the kart did, changes made during the day, anything worth remembering…"></textarea></div>
+      </div>
+
+      <div class="btn-row">
+        <button type="submit" class="btn">💾 Save session</button>
+        <button type="reset" class="btn secondary">Clear form</button>
+        <span id="editingNote" class="pill" style="align-self:center; display:none;"></span>
+      </div>
+    </form>
+  </section>
+
+  <!-- ===================== HISTORY ===================== -->
+  <section class="view" id="history">
+    <h2>Session History</h2>
+    <p class="sub">Every session you've logged. Click a row to load it for editing.</p>
+    <div class="card">
+      <div class="row-between" style="margin-bottom:12px;">
+        <div style="flex:1; min-width:200px;">
+          <input id="historyFilter" placeholder="🔎 Filter by track, date, weather…">
+        </div>
+        <span class="pill" id="sessionCount">0 sessions</span>
+      </div>
+      <div class="table-wrap">
+        <table id="historyTable">
+          <thead><tr>
+            <th>Date</th><th>Track</th><th>Weather</th><th>Air°</th><th>Track°</th><th>Density</th>
+            <th>Rear trk</th><th>Axle</th><th>Tyre F/R</th><th>Best lap</th><th>Feel</th><th></th>
+          </tr></thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+      <div id="historyEmpty" class="empty">No sessions yet — log your first one on the <b>Log Session</b> tab.</div>
+    </div>
+  </section>
+
+  <!-- ===================== RECOMMENDATIONS ===================== -->
+  <section class="view" id="recommend">
+    <h2>Setup Recommendations</h2>
+    <p class="sub">Combines today's conditions, kart-tuning principles, and your own past data to suggest a direction.</p>
+
+    <div class="card">
+      <h3>🎯 What are we solving?</h3>
+      <div class="grid cols-3">
+        <div class="field"><label>Track</label><input id="recTrack" list="trackList" placeholder="Any / circuit name"></div>
+        <div class="field"><label>Problem to fix</label>
+          <select id="recIssue">
+            <option value="baseline">General — best baseline for the day</option>
+            <option value="speed">Down on speed / power</option>
+            <option value="understeer">Understeer — won't turn in</option>
+            <option value="oversteer">Oversteer / loose / snappy</option>
+            <option value="hopping">Hopping / too much grip</option>
+            <option value="overheat">Tyres overheating / greasy</option>
+            <option value="lowgrip">Low grip — can't get heat in tyres</option>
+          </select></div>
+        <div class="field"><label>Conditions source</label>
+          <select id="recCond"><option value="live">Today's live weather</option><option value="manual">Enter manually</option></select></div>
+      </div>
+      <div id="recManual" class="grid cols-4" style="margin-top:14px; display:none;">
+        <div class="field"><label>Weather</label><select id="mWeather"><option>Dry</option><option>Damp</option><option>Wet</option></select></div>
+        <div class="field"><label>Air temp (°C)</label><input type="number" id="mAir" value="20"></div>
+        <div class="field"><label>Track temp (°C)</label><input type="number" id="mTrack" value="28"></div>
+        <div class="field"><label>Rel. density (%)</label><input type="number" id="mDens" value="100"></div>
+      </div>
+      <div class="btn-row"><button class="btn" id="genRecBtn">⚡ Generate recommendations</button></div>
+    </div>
+
+    <div id="recOutput"></div>
+  </section>
+
+  <!-- ===================== DATA ===================== -->
+  <section class="view" id="data">
+    <h2>Data &amp; Backup</h2>
+    <p class="sub">Your sessions are stored in this browser. Export regularly so nothing is lost, and to move between devices.</p>
+    <div class="card">
+      <h3>💾 Backup</h3>
+      <div class="btn-row">
+        <button class="btn" id="exportBtn">⬇️ Export all data (JSON)</button>
+        <button class="btn secondary" id="importBtn">⬆️ Import data</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none;">
+      </div>
+      <p class="legend">Export creates a <code>.json</code> file with every session. Import merges sessions from a file.</p>
+    </div>
+    <div class="card">
+      <h3>⚠️ Danger zone</h3>
+      <div class="btn-row"><button class="btn secondary" id="wipeBtn" style="color:var(--bad);">Delete all sessions</button></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  KartCalc · weather by <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · setup tips are starting heuristics — calibrate them with your own logged data.
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================================
+   KartCalc — single-file app
+   Sections: state · weather (Open-Meteo) · physics · warnings ·
+             recommendations · rendering · events
+   ========================================================================= */
+
+/* ---------------- State ---------------- */
+const LS_SESSIONS = 'kartcalc.sessions';
+const LS_SETTINGS = 'kartcalc.settings';
+
+let sessions = load(LS_SESSIONS, []);
+let settings = load(LS_SETTINGS, { location: null, lastWeather: null });
+let editingId = null;
+
+function load(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+  catch { return fallback; }
+}
+function save() {
+  localStorage.setItem(LS_SESSIONS, JSON.stringify(sessions));
+  localStorage.setItem(LS_SETTINGS, JSON.stringify(settings));
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ---------------- Weather codes (WMO) ---------------- */
+const WMO = {
+  0:['Clear','☀️','Dry'], 1:['Mainly clear','🌤️','Dry'], 2:['Partly cloudy','⛅','Dry'], 3:['Overcast','☁️','Dry'],
+  45:['Fog','🌫️','Damp'], 48:['Rime fog','🌫️','Damp'],
+  51:['Light drizzle','🌦️','Damp'], 53:['Drizzle','🌦️','Damp'], 55:['Heavy drizzle','🌧️','Wet'],
+  56:['Freezing drizzle','🌧️','Wet'], 57:['Freezing drizzle','🌧️','Wet'],
+  61:['Light rain','🌦️','Damp'], 63:['Rain','🌧️','Wet'], 65:['Heavy rain','🌧️','Wet'],
+  66:['Freezing rain','🌧️','Wet'], 67:['Freezing rain','🌧️','Wet'],
+  71:['Light snow','🌨️','Wet'], 73:['Snow','🌨️','Wet'], 75:['Heavy snow','❄️','Wet'], 77:['Snow grains','🌨️','Wet'],
+  80:['Rain showers','🌦️','Wet'], 81:['Rain showers','🌧️','Wet'], 82:['Violent showers','⛈️','Wet'],
+  85:['Snow showers','🌨️','Wet'], 86:['Snow showers','❄️','Wet'],
+  95:['Thunderstorm','⛈️','Wet'], 96:['Thunderstorm + hail','⛈️','Wet'], 99:['Thunderstorm + hail','⛈️','Wet'],
+};
+function wmo(code) { return WMO[code] || ['Unknown','❓','Dry']; }
+
+/* ---------------- Physics ---------------- */
+// Air density from temperature (°C), relative humidity (%), pressure (hPa).
+function airDensity(tempC, rh, pressureHpa) {
+  const T = tempC + 273.15;
+  const Es = 6.1078 * Math.pow(10, (7.5 * tempC) / (tempC + 237.3));   // sat. vapour pressure (hPa)
+  const Pv = Es * (rh / 100);                                          // vapour partial pressure
+  const Pd = pressureHpa - Pv;                                         // dry-air partial pressure
+  return (Pd * 100) / (287.058 * T) + (Pv * 100) / (461.495 * T);      // kg/m³
+}
+const RHO0 = 1.225; // standard air density (15°C, sea level)
+function relDensity(rho) { return (rho / RHO0) * 100; }
+
+// Rough grip estimate (0-100) from weather + track temp.
+function gripIndex(weatherClass, trackTemp, airTemp) {
+  if (weatherClass === 'Wet') return 22;
+  if (weatherClass === 'Damp') return 42;
+  const t = (trackTemp ?? airTemp ?? 20);
+  if (t < 12) return 45;
+  if (t < 20) return 62;
+  if (t < 30) return 80;
+  if (t < 42) return 88;
+  return 70; // very hot — tyres can go off / overheat
+}
+function gripLabel(idx) { return idx >= 75 ? 'High' : idx >= 55 ? 'Medium' : 'Low'; }
+
+/* Build a normalized "conditions" object from a current-weather reading. */
+function conditionsFromWeather(w) {
+  const rho = airDensity(w.temp, w.humidity, w.pressure);
+  const rel = relDensity(rho);
+  const cls = wmo(w.code)[2];
+  const gi = gripIndex(cls, null, w.temp);
+  return {
+    weather: cls, airTemp: round1(w.temp), trackTemp: null,
+    humidity: Math.round(w.humidity), pressure: round1(w.pressure),
+    airDensity: round3(rho), relDensity: round1(rel),
+    grip: gripLabel(gi), gripIndex: gi, windSpeed: round1(w.wind), code: w.code,
+  };
+}
+const round1 = n => Math.round(n * 10) / 10;
+const round3 = n => Math.round(n * 1000) / 1000;
+
+/* ---------------- Weather fetch (Open-Meteo) ---------------- */
+async function geocode(name) {
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=5&language=en&format=json`;
+  const r = await fetch(url); const j = await r.json();
+  return j.results || [];
+}
+async function fetchWeather(lat, lon) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
+    + `&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,weather_code,precipitation`
+    + `&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,surface_pressure,wind_speed_10m,weather_code`
+    + `&forecast_days=2&timezone=auto&wind_speed_unit=kmh`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('weather fetch failed');
+  return r.json();
+}
+
+/* ---------------- Warnings / "news calendar" ---------------- */
+function buildWarnings(data) {
+  const h = data.hourly;
+  if (!h) return { events: [], headline: '' };
+  const now = new Date();
+  const times = h.time.map(t => new Date(t));
+  // window: from now to +20h
+  const idx = [];
+  for (let i = 0; i < times.length; i++) {
+    if (times[i] >= new Date(now.getTime() - 3600e3) && times[i] <= new Date(now.getTime() + 20 * 3600e3)) idx.push(i);
+  }
+  const events = [];
+  const fmt = d => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // --- Rain windows ---
+  let raining = false;
+  for (const i of idx) {
+    const wet = (h.precipitation_probability?.[i] ?? 0) >= 50 || (h.precipitation?.[i] ?? 0) >= 0.2;
+    if (wet && !raining) {
+      raining = true;
+      events.push({ t: times[i], sev: 'bad', ico: '🌧️',
+        msg: `Rain likely from ${fmt(times[i])} (${h.precipitation_probability?.[i] ?? '?'}% chance). Have a wet setup ready.` });
+    } else if (!wet && raining) {
+      raining = false;
+      events.push({ t: times[i], sev: 'good', ico: '🌤️', msg: `Rain easing around ${fmt(times[i])} — track should begin drying.` });
+    }
+  }
+  if (!events.some(e => e.ico === '🌧️')) {
+    events.push({ t: now, sev: 'good', ico: '☀️', msg: 'No significant rain expected in the next 20 hours — dry running likely.' });
+  }
+
+  // --- Temperature swing ---
+  const temps = idx.map(i => h.temperature_2m[i]);
+  const tMax = Math.max(...temps), tMin = Math.min(...temps);
+  const iMax = idx[temps.indexOf(tMax)], iMin = idx[temps.indexOf(tMin)];
+  if (tMax - tMin >= 6) {
+    events.push({ t: times[iMax], sev: 'warn', ico: '🌡️',
+      msg: `Big temp swing today: ${round1(tMin)}°C → ${round1(tMax)}°C (peak ~${fmt(times[iMax])}). Grip & tyre pressures will move — re-check between sessions.` });
+  }
+
+  // --- Air density window ---
+  const dens = idx.map(i => relDensity(airDensity(h.temperature_2m[i], h.relative_humidity_2m[i], h.surface_pressure[i])));
+  const dMin = Math.min(...dens), dMax = Math.max(...dens);
+  const iDmin = idx[dens.indexOf(dMin)];
+  if (dMin < 98) {
+    events.push({ t: times[iDmin], sev: 'warn', ico: '🪫',
+      msg: `Air density bottoms out ~${fmt(times[iDmin])} at ${round1(dMin)}% of standard — expect the engine down ~${round1(100 - dMin)}% on power. Lean window for jetting.` });
+  } else if (dMax > 102) {
+    events.push({ t: now, sev: 'good', ico: '🔋',
+      msg: `Dense air today (up to ${round1(dMax)}% of standard) — strong power. Richen jetting vs a hot day.` });
+  }
+
+  // --- Wind ---
+  const winds = idx.map(i => h.wind_speed_10m[i]);
+  const wMax = Math.max(...winds), iWmax = idx[winds.indexOf(wMax)];
+  if (wMax >= 30) {
+    events.push({ t: times[iWmax], sev: 'info', ico: '💨',
+      msg: `Strong wind ~${fmt(times[iWmax])} (${Math.round(wMax)} km/h) — expect a headwind/tailwind effect on the straight and a twitchier kart.` });
+  }
+
+  events.sort((a, b) => a.t - b.t);
+
+  // --- Headline ---
+  const cur = data.current;
+  const curCls = wmo(cur.weather_code)[2];
+  const curDens = round1(relDensity(airDensity(cur.temperature_2m, cur.relative_humidity_2m, cur.surface_pressure)));
+  let parts = [`${round1(cur.temperature_2m)}°C, ${curCls.toLowerCase()}`];
+  parts.push(curDens < 98 ? `thin air (${curDens}%) — down on power` : curDens > 102 ? `dense air (${curDens}%) — strong power` : `air density normal (${curDens}%)`);
+  if (events.some(e => e.ico === '🌧️')) parts.push('rain incoming');
+  const headline = parts.join(' · ');
+
+  return { events, headline };
+}
+
+/* ---------------- Recommendation engine ---------------- */
+// Directional setup advice from conditions (grip + density).
+function conditionAdvice(cond) {
+  const recs = [];
+  const grip = cond.grip || gripLabel(gripIndex(cond.weather, cond.trackTemp, cond.airTemp));
+  const rel = cond.relDensity ?? 100;
+
+  // Engine / jetting from air density
+  const jet = [];
+  if (rel < 98) {
+    jet.push(`Thin air at ${round1(rel)}% of standard — roughly <span class="delta-down">${round1(100 - rel)}% less power</span>.`);
+    jet.push(`Go <b>leaner</b> on the main jet (smaller) vs your dense-air baseline; thin air needs less fuel.`);
+  } else if (rel > 102) {
+    jet.push(`Dense air at ${round1(rel)}% of standard — more oxygen, <span class="delta-up">stronger power</span>.`);
+    jet.push(`Go <b>richer</b> on the main jet (larger) to match the extra air.`);
+  } else {
+    jet.push(`Air density is about standard (${round1(rel)}%) — run your baseline jetting.`);
+  }
+  jet.push(`Always confirm with plug colour / EGT and err slightly rich on a 2-stroke to avoid a lean seizure.`);
+  recs.push({ h: '⛽ Engine / jetting', items: jet });
+
+  // Chassis from grip level
+  const chassis = [];
+  if (grip === 'Low') {
+    chassis.push('Low grip (cold / green / damp) — you want to <b>add mechanical grip</b>:');
+    chassis.push('Narrow the <b>rear track</b> (more side grip).');
+    chassis.push('Fit a <b>softer axle</b> for more flex and bite.');
+    chassis.push('Raise <b>ride heights</b> (more weight transfer = more grip).');
+    chassis.push('Raise <b>cold tyre pressures</b> to build heat faster.');
+    chassis.push('Widen the <b>front track</b> a touch for sharper turn-in.');
+  } else if (grip === 'High') {
+    chassis.push('High grip (hot / rubbered-in) — you want to <b>free the kart up</b> so it doesn\'t bog or hop:');
+    chassis.push('Widen the <b>rear track</b> (less grip, less hopping).');
+    chassis.push('Fit a <b>harder/stiffer axle</b>.');
+    chassis.push('Lower <b>ride heights</b> (less weight transfer, more stable).');
+    chassis.push('Lower <b>cold tyre pressures</b> to stop the tyres overheating.');
+    chassis.push('Narrow the <b>front track</b> slightly to calm turn-in.');
+  } else {
+    chassis.push('Medium grip — run a balanced baseline and fine-tune by feel:');
+    chassis.push('Mid rear track, medium axle, medium ride height.');
+    chassis.push('Set tyre pressures to your normal target and adjust ±0.3 psi by tyre temps.');
+  }
+  recs.push({ h: '🔧 Chassis direction', items: chassis });
+  return recs;
+}
+
+// Issue-specific advice.
+const ISSUE_ADVICE = {
+  understeer: { h: '↪️ Fixing understeer (won\'t turn in)', items: [
+    'Add <b>front grip</b>: widen front track, add a touch more negative front camber, add caster.',
+    'Raise <b>front</b> tyre pressure slightly (or lower rear) to shift balance forward.',
+    'Free the rear a little: widen rear track so the front can take charge.',
+    'Check the kart is "jacking" — lifting the inside rear through the corner. If not, more caster / wider front.' ]},
+  oversteer: { h: '↩️ Fixing oversteer / loose / snappy', items: [
+    'Add <b>rear grip</b>: narrow the rear track.',
+    'Calm the front: narrow front track, reduce caster.',
+    'Lower front tyre pressure (or raise rear) to move balance rearward.',
+    'A softer axle can settle a snappy rear; check seat is mounted solidly.' ]},
+  hopping: { h: '🦘 Fixing hopping / too much grip', items: [
+    'Free the kart: <b>widen the rear track</b> (biggest lever).',
+    'Fit a <b>harder axle</b> and <b>lower the ride height</b>.',
+    'Drop tyre pressures a little — overheated tyres often trigger hop.',
+    'Make sure you\'re not over-driving / coasting mid-corner.' ]},
+  overheat: { h: '🔥 Fixing tyres overheating / going greasy', items: [
+    'Lower <b>cold tyre pressures</b> (most direct fix).',
+    'Reduce overall grip: widen rear track, harder axle, lower ride height.',
+    'Check toe/alignment isn\'t scrubbing the tyres.',
+    'Manage out-laps — don\'t build excess heat before the timed laps.' ]},
+  lowgrip: { h: '❄️ Fixing low grip / can\'t get heat in', items: [
+    'Raise <b>cold tyre pressures</b> to generate heat faster.',
+    'Add grip: narrow rear track, softer axle, raise ride heights.',
+    'Widen front track for sharper steering and more load on the tyres.',
+    'On a green/cold track, expect it to come in over a few laps.' ]},
+  speed: { h: '🚀 Finding lost speed / power', items: [
+    'First suspect <b>jetting vs air density</b> (see engine note) — the most common cause of "down on power".',
+    'Confirm tyre pressures are in the working window — over-pressure scrubs speed, under-pressure rolls the tyre.',
+    'Check alignment/toe for drag, and that the kart isn\'t over-gripped (bogging out of corners).',
+    'Verify gearing suits the circuit; review the proven baseline below if you have past data here.' ]},
+};
+
+// Find the fastest past session at this track in similar conditions.
+function bestSimilar(track, cond) {
+  let pool = sessions.filter(s => parseLap(s.bestLap) != null);
+  if (track) pool = pool.filter(s => (s.track || '').toLowerCase().includes(track.toLowerCase()));
+  if (!pool.length) return null;
+  const score = s => {
+    let d = 0;
+    if (s.airTemp != null && cond.airTemp != null) d += Math.abs(s.airTemp - cond.airTemp) * 1.0;
+    if (s.relDensity != null && cond.relDensity != null) d += Math.abs(s.relDensity - cond.relDensity) * 0.8;
+    if (s.weather && cond.weather) d += (s.weather === cond.weather ? 0 : 12);
+    if (s.grip && cond.grip) d += (s.grip === cond.grip ? 0 : 6);
+    return d;
+  };
+  pool.sort((a, b) => {
+    const sa = score(a), sb = score(b);
+    if (Math.abs(sa - sb) < 0.5) return parseLap(a.bestLap) - parseLap(b.bestLap);
+    return sa - sb;
+  });
+  return pool[0];
+}
+function parseLap(str) {
+  if (!str) return null;
+  str = String(str).trim();
+  let m = str.match(/^(\d+):(\d+(?:\.\d+)?)$/);   // m:ss.xxx
+  if (m) return parseInt(m[1]) * 60 + parseFloat(m[2]);
+  const n = parseFloat(str);
+  return isNaN(n) ? null : n;
+}
+
+function generateRecommendations(track, issue, cond) {
+  const blocks = [];
+  blocks.push(`<div class="headline">Conditions used: <b>${cond.weather}</b>, ${cond.airTemp ?? '?'}°C air${cond.trackTemp != null ? ', ' + cond.trackTemp + '°C track' : ''}, density <b>${round1(cond.relDensity ?? 100)}%</b>, grip <b>${cond.grip || '—'}</b>.</div>`);
+
+  // issue-specific first (if any)
+  if (issue !== 'baseline' && ISSUE_ADVICE[issue]) {
+    const a = ISSUE_ADVICE[issue];
+    blocks.push(recHtml(a.h, a.items));
+  }
+
+  // condition-based direction
+  conditionAdvice(cond).forEach(r => blocks.push(recHtml(r.h, r.items)));
+
+  // proven baseline from data
+  const best = bestSimilar(track, cond);
+  if (best) {
+    const items = [
+      `<b>${best.track}</b> on ${best.date} — best lap <b>${best.bestLap}</b> (${best.weather}, ${best.airTemp ?? '?'}°C, density ${best.relDensity ?? '?'}%).`,
+      setupLine(best),
+      best.notes ? `Notes: <i>${escapeHtml(best.notes)}</i>` : null,
+      `Start from this and apply the directional changes above for any difference in today's conditions.`,
+    ].filter(Boolean);
+    blocks.push(recHtml('📈 Your proven baseline in similar conditions', items));
+  } else {
+    blocks.push(`<div class="caveat">No past sessions ${track ? 'at "' + escapeHtml(track) + '" ' : ''}in similar conditions yet. Log a few sessions with lap times and KartCalc will start showing your fastest proven setup here.</div>`);
+  }
+
+  blocks.push(`<div class="caveat">These are starting heuristics based on common sprint-kart tuning. Direction can vary by chassis and tyre — always verify against tyre temperatures, plug readings and your own logged data.</div>`);
+  return blocks.join('');
+}
+function recHtml(h, items) {
+  return `<div class="rec"><div class="rec-h">${h}</div><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
+}
+function setupLine(s) {
+  const p = [];
+  if (s.rearTrack) p.push(`rear ${s.rearTrack}mm`);
+  if (s.frontTrack) p.push(`front ${s.frontTrack}mm`);
+  if (s.axle) p.push(`${s.axle} axle`);
+  if (s.camberFront) p.push(`camber ${s.camberFront}°`);
+  if (s.rideFront || s.rideRear) p.push(`ride ${s.rideFront || '?'}/${s.rideRear || '?'}`);
+  if (s.tyreFront || s.tyreRear) p.push(`tyres ${s.tyreFront || '?'}/${s.tyreRear || '?'} psi`);
+  if (s.mainJet) p.push(`jet ${s.mainJet}`);
+  if (s.gear) p.push(`gear ${s.gear}`);
+  return 'Setup: ' + (p.join(' · ') || 'not recorded') + '.';
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+/* ---------------- Rendering: weather ---------------- */
+function renderWeather(data, place) {
+  const cur = data.current;
+  const [desc, emoji, cls] = wmo(cur.weather_code);
+  const rho = airDensity(cur.temperature_2m, cur.relative_humidity_2m, cur.surface_pressure);
+  const rel = relDensity(rho);
+  const gi = gripIndex(cls, null, cur.temperature_2m);
+  const { events, headline } = buildWarnings(data);
+
+  const densColor = rel < 98 ? 'var(--bad)' : rel > 102 ? 'var(--good)' : 'var(--warn)';
+  const html = `
+    <div class="card">
+      <div class="row-between">
+        <div class="bigweather">
+          <div class="emoji">${emoji}</div>
+          <div>
+            <div class="temp">${round1(cur.temperature_2m)}°C</div>
+            <div class="desc">${desc} · ${place}</div>
+          </div>
+        </div>
+        <span class="tag ${cls.toLowerCase()}">${cls}</span>
+      </div>
+    </div>
+
+    <div class="grid cols-4">
+      <div class="metric"><div class="k">Humidity</div><div class="v">${Math.round(cur.relative_humidity_2m)}<small>%</small></div></div>
+      <div class="metric"><div class="k">Pressure</div><div class="v">${round1(cur.surface_pressure)}<small> hPa</small></div></div>
+      <div class="metric"><div class="k">Wind</div><div class="v">${Math.round(cur.wind_speed_10m)}<small> km/h</small></div></div>
+      <div class="metric"><div class="k">Grip estimate</div><div class="v">${gripLabel(gi)}</div><div class="note">from temp &amp; weather</div></div>
+    </div>
+
+    <div class="card">
+      <h3>🌫️ Air density ("air thickness")</h3>
+      <div class="grid cols-2" style="align-items:center;">
+        <div>
+          <div class="metric" style="background:transparent;border:none;padding:0;">
+            <div class="v" style="color:${densColor};">${round1(rel)}<small>% of standard</small></div>
+            <div class="note">${round3(rho)} kg/m³ &nbsp;·&nbsp; standard = 1.225 kg/m³ at 15°C</div>
+          </div>
+          <div class="bar" style="margin-top:10px;"><i style="width:${Math.max(0, Math.min(100, (rel - 85) / 0.30))}%"></i></div>
+        </div>
+        <div class="note">
+          ${rel < 98
+            ? `Thin air → roughly <b>${round1(100 - rel)}% less engine power</b> and a tendency to run rich. Lean the jetting.`
+            : rel > 102
+              ? `Dense air → <b>strong power</b>. The engine will want richer jetting than on a hot day.`
+              : `About standard — run your baseline power and jetting.`}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📅 Today's warnings calendar</h3>
+      <div class="headline" style="margin-bottom:12px;">${headline}</div>
+      <div class="agenda">
+        ${events.map(e => `
+          <div class="event ${e.sev}">
+            <div class="ico">${e.ico}</div>
+            <div class="time">${e.t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+            <div class="msg">${e.msg}</div>
+          </div>`).join('')}
+      </div>
+      <div class="btn-row"><button class="btn ghost" onclick="goLogWithToday()">📝 Log a session in these conditions</button></div>
+    </div>
+  `;
+  document.getElementById('weatherArea').innerHTML = html;
+}
+
+/* ---------------- Rendering: history ---------------- */
+function renderHistory() {
+  const filter = (document.getElementById('historyFilter').value || '').toLowerCase();
+  const body = document.getElementById('historyBody');
+  const rows = sessions
+    .slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt)
+    .filter(s => !filter || [s.track, s.date, s.weather, s.kart, s.feel].join(' ').toLowerCase().includes(filter));
+
+  document.getElementById('sessionCount').textContent = `${sessions.length} session${sessions.length === 1 ? '' : 's'}`;
+  document.getElementById('historyEmpty').style.display = sessions.length ? 'none' : 'block';
+
+  body.innerHTML = rows.map(s => `
+    <tr onclick="editSession('${s.id}')" style="cursor:pointer;">
+      <td>${s.date || '—'}</td>
+      <td>${escapeHtml(s.track || '—')}</td>
+      <td><span class="tag ${(s.weather || 'dry').toLowerCase()}">${s.weather || '—'}</span></td>
+      <td>${s.airTemp ?? '—'}</td>
+      <td>${s.trackTemp ?? '—'}</td>
+      <td>${s.relDensity != null ? round1(s.relDensity) + '%' : '—'}</td>
+      <td>${s.rearTrack || '—'}</td>
+      <td>${s.axle || '—'}</td>
+      <td>${(s.tyreFront || '?') + '/' + (s.tyreRear || '?')}</td>
+      <td><b>${s.bestLap || '—'}</b></td>
+      <td>${s.feel || '—'}</td>
+      <td><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="event.stopPropagation();deleteSession('${s.id}')">✕</button></td>
+    </tr>`).join('');
+
+  // refresh datalists of track names
+  const tracks = [...new Set(sessions.map(s => s.track).filter(Boolean))];
+  document.getElementById('trackList').innerHTML = tracks.map(t => `<option value="${escapeHtml(t)}">`).join('');
+}
+
+/* ---------------- Form <-> session ---------------- */
+const NUM = ['camberFront', 'frontTrack', 'rearTrack', 'tyreFront', 'tyreRear', 'airTemp', 'trackTemp', 'humidity', 'pressure', 'airDensity', 'relDensity'];
+function formToSession(form) {
+  const fd = new FormData(form);
+  const s = {};
+  for (const [k, v] of fd.entries()) s[k] = (v === '' ? null : v);
+  NUM.forEach(k => { if (s[k] != null) s[k] = parseFloat(s[k]); });
+  // auto density if temp/humidity/pressure present and density blank
+  if (s.airDensity == null && s.airTemp != null && s.humidity != null && s.pressure != null) {
+    s.airDensity = round3(airDensity(s.airTemp, s.humidity, s.pressure));
+    s.relDensity = round1(relDensity(s.airDensity));
+  }
+  return s;
+}
+function fillForm(s) {
+  const form = document.getElementById('logForm');
+  form.reset();
+  Object.entries(s).forEach(([k, v]) => { if (form.elements[k] && v != null) form.elements[k].value = v; });
+}
+
+/* ---------------- Events ---------------- */
+// nav
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => showView(btn.dataset.view, btn));
+});
+function showView(id, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === id));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  (btn || document.querySelector(`nav button[data-view="${id}"]`)).classList.add('active');
+  window.scrollTo({ top: 0 });
+}
+
+// location search
+document.getElementById('searchBtn').addEventListener('click', doSearch);
+document.getElementById('cityInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
+async function doSearch() {
+  const name = document.getElementById('cityInput').value.trim();
+  if (!name) return;
+  const box = document.getElementById('geoResults');
+  box.innerHTML = '<span class="note">Searching…</span>';
+  try {
+    const results = await geocode(name);
+    if (!results.length) { box.innerHTML = '<span class="note">No matches — try a nearby town.</span>'; return; }
+    box.innerHTML = results.map((r, i) =>
+      `<button class="btn secondary" style="margin:4px 6px 0 0;" onclick="pickPlace(${r.latitude},${r.longitude},'${escapeAttr((r.name) + (r.admin1 ? ', ' + r.admin1 : '') + (r.country ? ', ' + r.country : ''))}')">${escapeHtml(r.name)}${r.admin1 ? ', ' + escapeHtml(r.admin1) : ''} <span class="pill">${escapeHtml(r.country || '')}</span></button>`
+    ).join('');
+  } catch (e) { box.innerHTML = '<span class="note" style="color:var(--bad)">Search failed — check your connection.</span>'; }
+}
+function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
+
+window.pickPlace = async function (lat, lon, label) {
+  document.getElementById('geoResults').innerHTML = '<span class="note">Loading weather…</span>';
+  settings.location = { lat, lon, name: label };
+  await refreshWeather();
+  document.getElementById('geoResults').innerHTML = '';
+  save();
+};
+
+document.getElementById('geoBtn').addEventListener('click', () => {
+  if (!navigator.geolocation) { toast('Geolocation not available'); return; }
+  document.getElementById('geoResults').innerHTML = '<span class="note">Getting your location…</span>';
+  navigator.geolocation.getCurrentPosition(
+    async pos => { await window.pickPlace(round3(pos.coords.latitude), round3(pos.coords.longitude), 'My location'); },
+    () => { document.getElementById('geoResults').innerHTML = '<span class="note" style="color:var(--bad)">Location permission denied.</span>'; }
+  );
+});
+
+async function refreshWeather() {
+  if (!settings.location) return;
+  const { lat, lon, name } = settings.location;
+  document.getElementById('locPill').textContent = '📍 ' + name;
+  try {
+    const data = await fetchWeather(lat, lon);
+    settings.lastWeather = { data, name, at: Date.now() };
+    renderWeather(data, name);
+    save();
+  } catch (e) {
+    document.getElementById('weatherArea').innerHTML = '<div class="card"><span class="note" style="color:var(--bad)">Could not load weather. Check your connection and try again.</span></div>';
+  }
+}
+
+// "Use today's live conditions" in the log form
+document.getElementById('useTodayBtn').addEventListener('click', () => {
+  const lw = settings.lastWeather;
+  if (!lw) { toast('Set a location on the Conditions tab first'); showView('dashboard'); return; }
+  const c = conditionsFromWeather({
+    temp: lw.data.current.temperature_2m, humidity: lw.data.current.relative_humidity_2m,
+    pressure: lw.data.current.surface_pressure, wind: lw.data.current.wind_speed_10m, code: lw.data.current.weather_code,
+  });
+  const form = document.getElementById('logForm');
+  form.weather.value = c.weather; form.airTemp.value = c.airTemp; form.humidity.value = c.humidity;
+  form.pressure.value = c.pressure; form.airDensity.value = c.airDensity; form.relDensity.value = c.relDensity;
+  form.grip.value = c.grip;
+  toast('Live conditions filled in');
+});
+
+window.goLogWithToday = function () {
+  showView('log');
+  if (!document.getElementById('logForm').date.value) document.getElementById('logForm').date.value = new Date().toISOString().slice(0, 10);
+  document.getElementById('useTodayBtn').click();
+};
+
+// save session
+document.getElementById('logForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const s = formToSession(e.target);
+  if (editingId) {
+    const i = sessions.findIndex(x => x.id === editingId);
+    sessions[i] = { ...sessions[i], ...s, id: editingId };
+    toast('Session updated');
+  } else {
+    s.id = uid(); s.createdAt = Date.now();
+    sessions.push(s);
+    toast('Session saved');
+  }
+  editingId = null; document.getElementById('editingNote').style.display = 'none';
+  save(); renderHistory(); e.target.reset();
+  showView('history');
+});
+
+window.editSession = function (id) {
+  const s = sessions.find(x => x.id === id); if (!s) return;
+  editingId = id; fillForm(s);
+  const note = document.getElementById('editingNote');
+  note.style.display = 'inline-block'; note.textContent = `Editing ${s.track || ''} ${s.date || ''}`;
+  showView('log');
+};
+window.deleteSession = function (id) {
+  if (!confirm('Delete this session?')) return;
+  sessions = sessions.filter(x => x.id !== id);
+  save(); renderHistory(); toast('Session deleted');
+};
+
+document.getElementById('historyFilter').addEventListener('input', renderHistory);
+
+// recommendations
+document.getElementById('recCond').addEventListener('change', e => {
+  document.getElementById('recManual').style.display = e.target.value === 'manual' ? 'grid' : 'none';
+});
+document.getElementById('genRecBtn').addEventListener('click', () => {
+  const track = document.getElementById('recTrack').value.trim();
+  const issue = document.getElementById('recIssue').value;
+  let cond;
+  if (document.getElementById('recCond').value === 'live' && settings.lastWeather) {
+    cond = conditionsFromWeather({
+      temp: settings.lastWeather.data.current.temperature_2m,
+      humidity: settings.lastWeather.data.current.relative_humidity_2m,
+      pressure: settings.lastWeather.data.current.surface_pressure,
+      wind: settings.lastWeather.data.current.wind_speed_10m,
+      code: settings.lastWeather.data.current.weather_code,
+    });
+  } else {
+    const weather = document.getElementById('mWeather').value;
+    const airTemp = parseFloat(document.getElementById('mAir').value);
+    const trackTemp = parseFloat(document.getElementById('mTrack').value);
+    const rel = parseFloat(document.getElementById('mDens').value);
+    cond = { weather, airTemp, trackTemp, relDensity: rel, grip: gripLabel(gripIndex(weather, trackTemp, airTemp)) };
+    if (document.getElementById('recCond').value === 'live') {
+      document.getElementById('recOutput').innerHTML = '<div class="caveat">No live weather yet — set a location on the Conditions tab, or switch to manual.</div>';
+      return;
+    }
+  }
+  document.getElementById('recOutput').innerHTML = generateRecommendations(track, issue, cond);
+});
+
+// data export / import / wipe
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify({ app: 'KartCalc', version: 1, exportedAt: new Date().toISOString(), sessions }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kartcalc-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('Exported');
+});
+document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const j = JSON.parse(reader.result);
+      const incoming = Array.isArray(j) ? j : (j.sessions || []);
+      const ids = new Set(sessions.map(s => s.id));
+      let added = 0;
+      incoming.forEach(s => { if (!s.id) s.id = uid(); if (!ids.has(s.id)) { sessions.push(s); added++; } });
+      save(); renderHistory(); toast(`Imported ${added} session${added === 1 ? '' : 's'}`);
+    } catch { toast('Could not read that file'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+document.getElementById('wipeBtn').addEventListener('click', () => {
+  if (!confirm('Delete ALL sessions? This cannot be undone. Export a backup first if unsure.')) return;
+  sessions = []; save(); renderHistory(); toast('All sessions deleted');
+});
+
+/* ---------------- Init ---------------- */
+(function init() {
+  // default date = today
+  document.getElementById('logForm').date.value = new Date().toISOString().slice(0, 10);
+  renderHistory();
+  if (settings.location) {
+    document.getElementById('cityInput').value = settings.location.name || '';
+    // show cached weather instantly, then refresh
+    if (settings.lastWeather) renderWeather(settings.lastWeather.data, settings.lastWeather.name);
+    refreshWeather();
+  } else {
+    document.getElementById('weatherArea').innerHTML = '<div class="card empty">Set your circuit location above to see live weather, air density and the warnings calendar.</div>';
+  }
+})();
+</script>
+</body>
+</html>
