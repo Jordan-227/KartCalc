@@ -399,7 +399,7 @@
               <select name="axle" id="axleSelect"><option value="">—</option><option>Soft</option><option>Medium</option><option>Hard</option></select>
               <div class="hint" id="axleHint" style="display:none;">KR-S = softest · KR-M = middle · KR-HH = hardest.</div></div>
             <div class="field" id="torsionBarField" style="display:none;"><label>Torsion bar</label>
-              <select name="torsionBar"><option value="">—</option><option>Nylon</option><option>Nylon ribbed</option><option>Chrome</option><option>Teflon</option></select></div>
+              <select name="torsionBar"><option value="">—</option></select></div>
             <div class="field"><label>Front ride height</label>
               <select name="rideFront"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
             <div class="field"><label>Rear ride height</label>
@@ -1421,6 +1421,7 @@ function fillForm(s) {
   if (s.chassisBrand && form.elements['chassisBrand']) {
     form.elements['chassisBrand'].value = s.chassisBrand;
     updateAxleOptionsForBrand(s.chassisBrand);
+    updateTorsionBarVisibility(s.chassisBrand);
   }
   Object.entries(s).forEach(([k, v]) => {
     if (k === 'chassisBrand') return;
@@ -1467,12 +1468,25 @@ function updateChassisVisibility() {
   updateTorsionBarVisibility(sel.value);
 }
 
+const TORSION_BAR_PROFILES = {
+  'Kart Republic': ['Nylon', 'Nylon ribbed', 'Chrome'],
+  'OTK': ['Horizontal position', 'Circular chrome bar', 'Ovalized chrome bar'],
+};
 function updateTorsionBarVisibility(brand) {
   const field = document.getElementById('torsionBarField');
   if (!field) return;
-  const isKR = brand === 'Kart Republic';
-  field.style.display = isKR ? '' : 'none';
-  if (!isKR) field.querySelector('select').value = '';
+  const select = field.querySelector('select');
+  const options = TORSION_BAR_PROFILES[brand];
+  if (!options) {
+    field.style.display = 'none';
+    select.value = '';
+    return;
+  }
+  const previous = select.value;
+  select.innerHTML = '<option value="">—</option>'
+    + options.map(o => `<option>${escapeHtml(o)}</option>`).join('');
+  if (options.includes(previous)) select.value = previous;
+  field.style.display = '';
 }
 
 const AXLE_OPTIONS_DEFAULT = ['Soft', 'Medium', 'Hard'];
