@@ -397,15 +397,19 @@
             <div class="field"><label>Rear ride height</label>
               <select name="rideRear"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
             <div class="field"><label>Seat position</label>
-              <select name="seat"><option value="">—</option><option>Forward</option><option>Standard</option><option>Back</option><option>Lower</option><option>Higher</option></select></div>
+              <select name="seat"><option value="">—</option><option>Forward</option><option>Standard</option><option>Back</option></select></div>
+
+            <div class="field" style="grid-column: span 2;"><label>Seat height (mm)</label>
+              <input type="number" step="0.1" name="seatHeight" placeholder="e.g. 2.0 or -1.5">
+              <div class="hint">0 = seat flush with chassis rails. Negative below, positive above.</div>
+            </div>
+            <div class="field"><label>Tyre compound</label><input name="compound" placeholder="e.g. MOJO D5"></div>
+            <div class="field"><label>Gearing</label><input name="gear" placeholder="e.g. 11 / 82"></div>
 
             <div class="field"><label>Tyre press. FL (psi)</label><input type="number" step="0.1" name="tyreFL" placeholder="11.0"></div>
             <div class="field"><label>Tyre press. FR (psi)</label><input type="number" step="0.1" name="tyreFR" placeholder="11.0"></div>
             <div class="field"><label>Tyre press. RL (psi)</label><input type="number" step="0.1" name="tyreRL" placeholder="11.0"></div>
             <div class="field"><label>Tyre press. RR (psi)</label><input type="number" step="0.1" name="tyreRR" placeholder="11.0"></div>
-
-            <div class="field"><label>Tyre compound</label><input name="compound" placeholder="e.g. MOJO D5"></div>
-            <div class="field"><label>Gearing</label><input name="gear" placeholder="e.g. 11 / 82"></div>
           </div>
         </div>
       </div>
@@ -1386,7 +1390,7 @@ function renderHistory() {
 }
 
 /* ---------------- Form <-> session ---------------- */
-const NUM = ['camberFront', 'frontTrack', 'rearTrack', 'tyreFL', 'tyreFR', 'tyreRL', 'tyreRR', 'airTemp', 'trackTemp', 'humidity', 'pressure', 'airDensity', 'relDensity'];
+const NUM = ['camberFront', 'frontTrack', 'rearTrack', 'seatHeight', 'tyreFL', 'tyreFR', 'tyreRL', 'tyreRR', 'airTemp', 'trackTemp', 'humidity', 'pressure', 'airDensity', 'relDensity'];
 function formToSession(form) {
   const fd = new FormData(form);
   const s = {};
