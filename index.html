@@ -406,7 +406,6 @@
 
             <div class="field"><label>Tyre compound</label><input name="compound" placeholder="e.g. MOJO D5"></div>
             <div class="field"><label>Gearing</label><input name="gear" placeholder="e.g. 11 / 82"></div>
-            <div class="field"><label>Main jet</label><input name="mainJet" placeholder="e.g. 118"></div>
           </div>
         </div>
       </div>
@@ -1281,7 +1280,6 @@ function setupLine(s) {
   if (s.rideFront || s.rideRear) p.push(`ride ${s.rideFront || '?'}/${s.rideRear || '?'}`);
   const tyreSummary = tyrePressureSummary(s);
   if (tyreSummary !== '—') p.push(`tyres ${tyreSummary} psi`);
-  if (s.mainJet) p.push(`jet ${s.mainJet}`);
   if (s.gear) p.push(`gear ${s.gear}`);
   return 'Setup: ' + (p.join(' · ') || 'not recorded') + '.';
 }
