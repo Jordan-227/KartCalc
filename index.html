@@ -396,7 +396,8 @@
             <div class="field"><label>Rear track (mm)</label><input type="number" step="1" name="rearTrack" placeholder="1400"></div>
 
             <div class="field"><label>Axle hardness</label>
-              <select name="axle"><option value="">—</option><option>Soft</option><option>Medium</option><option>Hard</option></select></div>
+              <select name="axle" id="axleSelect"><option value="">—</option><option>Soft</option><option>Medium</option><option>Hard</option></select>
+              <div class="hint" id="axleHint" style="display:none;">KR-S = softest · KR-M = middle · KR-HH = hardest.</div></div>
             <div class="field"><label>Front ride height</label>
               <select name="rideFront"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
             <div class="field"><label>Rear ride height</label>
@@ -1412,7 +1413,16 @@ function formToSession(form) {
 function fillForm(s) {
   const form = document.getElementById('logForm');
   form.reset();
-  Object.entries(s).forEach(([k, v]) => { if (form.elements[k] && v != null) form.elements[k].value = v; });
+  // Apply the brand profile first so the axle dropdown has the right options
+  // before its value is restored from the saved session.
+  if (s.chassisBrand && form.elements['chassisBrand']) {
+    form.elements['chassisBrand'].value = s.chassisBrand;
+    updateAxleOptionsForBrand(s.chassisBrand);
+  }
+  Object.entries(s).forEach(([k, v]) => {
+    if (k === 'chassisBrand') return;
+    if (form.elements[k] && v != null) form.elements[k].value = v;
+  });
   updateChassisVisibility();
 }
 
@@ -1450,6 +1460,37 @@ function updateChassisVisibility() {
   const show = hasBrand || fieldHasValue;
   fields.style.display = show ? '' : 'none';
   hint.style.display = show ? 'none' : '';
+  updateAxleOptionsForBrand(sel.value);
+}
+
+const AXLE_OPTIONS_DEFAULT = ['Soft', 'Medium', 'Hard'];
+const AXLE_PROFILES = {
+  'Kart Republic': {
+    options: ['KR-S', 'KR-S1', 'KR-M', 'KR-H1', 'KR-HH'],
+    hint: 'KR-S = softest · KR-M = middle · KR-HH = hardest.',
+  },
+  'OTK': {
+    options: ['E', 'U', 'Q', 'N', 'A', 'H', 'HH'],
+    hint: 'E = softest · H = middle · HH = hardest.',
+  },
+};
+function updateAxleOptionsForBrand(brand) {
+  const axleSel = document.getElementById('axleSelect');
+  const axleHint = document.getElementById('axleHint');
+  if (!axleSel) return;
+  const profile = AXLE_PROFILES[brand];
+  const opts = profile ? profile.options : AXLE_OPTIONS_DEFAULT;
+  const current = axleSel.value;
+  axleSel.innerHTML = '<option value="">—</option>' + opts.map(o => `<option>${o}</option>`).join('');
+  axleSel.value = opts.includes(current) ? current : '';
+  if (axleHint) {
+    if (profile) {
+      axleHint.textContent = profile.hint;
+      axleHint.style.display = '';
+    } else {
+      axleHint.style.display = 'none';
+    }
+  }
 }
 
 /* ---------------- Events ---------------- */
