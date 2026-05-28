@@ -388,7 +388,7 @@
               </select>
               <div class="hint">Spacers per side on the stub axle.</div>
             </div>
-            <div class="field"><label>Rear track (mm)</label><input type="number" step="1" min="1390" name="rearTrack" placeholder="1400"></div>
+            <div class="field"><label>Rear track (mm)</label><input type="number" step="1" name="rearTrack" placeholder="1400"></div>
 
             <div class="field"><label>Axle hardness</label>
               <select name="axle"><option value="">—</option><option>Soft</option><option>Medium</option><option>Hard</option></select></div>
@@ -1408,6 +1408,28 @@ function fillForm(s) {
   updateChassisVisibility();
 }
 
+/* Seed Rear track at 1390mm the first time the user nudges it up/down from
+   empty, without enforcing a hard minimum — typing any value still works. */
+function wireRearTrackSeed() {
+  const rt = document.querySelector('input[name="rearTrack"]');
+  if (!rt) return;
+  const SEED_UP = '1390', SEED_DOWN = '1389';
+  let lastWasKeydown = false;
+  rt.addEventListener('keydown', e => {
+    lastWasKeydown = true;
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && rt.value === '') {
+      e.preventDefault();
+      rt.value = e.key === 'ArrowUp' ? SEED_UP : SEED_DOWN;
+    }
+  });
+  rt.addEventListener('input', () => {
+    if (!lastWasKeydown && (rt.value === '1' || rt.value === '-1')) {
+      rt.value = rt.value === '1' ? SEED_UP : SEED_DOWN;
+    }
+    lastWasKeydown = false;
+  });
+}
+
 /* Show the chassis setup fields only when a brand is selected, OR when
    editing an older session that has setup data but no brand recorded. */
 function updateChassisVisibility() {
@@ -1704,6 +1726,7 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
   wireLogTrackDropdown();
   document.getElementById('chassisBrand').addEventListener('change', updateChassisVisibility);
   updateChassisVisibility();
+  wireRearTrackSeed();
   renderHistory();
   if (settings.location) {
     document.getElementById('circuitLabel').textContent = settings.location.name || '— Select a circuit —';
