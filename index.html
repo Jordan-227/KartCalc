@@ -389,11 +389,13 @@
             <div class="field"><label>Seat position</label>
               <select name="seat"><option value="">—</option><option>Forward</option><option>Standard</option><option>Back</option><option>Lower</option><option>Higher</option></select></div>
 
-            <div class="field"><label>Tyre press. front (psi)</label><input type="number" step="0.1" name="tyreFront" placeholder="11.0"></div>
-            <div class="field"><label>Tyre press. rear (psi)</label><input type="number" step="0.1" name="tyreRear" placeholder="11.0"></div>
+            <div class="field"><label>Tyre press. FL (psi)</label><input type="number" step="0.1" name="tyreFL" placeholder="11.0"></div>
+            <div class="field"><label>Tyre press. FR (psi)</label><input type="number" step="0.1" name="tyreFR" placeholder="11.0"></div>
+            <div class="field"><label>Tyre press. RL (psi)</label><input type="number" step="0.1" name="tyreRL" placeholder="11.0"></div>
+            <div class="field"><label>Tyre press. RR (psi)</label><input type="number" step="0.1" name="tyreRR" placeholder="11.0"></div>
+
             <div class="field"><label>Tyre compound</label><input name="compound" placeholder="e.g. MOJO D5"></div>
             <div class="field"><label>Gearing</label><input name="gear" placeholder="e.g. 11 / 82"></div>
-
             <div class="field"><label>Main jet</label><input name="mainJet" placeholder="e.g. 118"></div>
           </div>
         </div>
@@ -453,7 +455,7 @@
         <table id="historyTable">
           <thead><tr>
             <th>Date</th><th>Track</th><th>Weather</th><th>Air°</th><th>Track°</th><th>Density</th>
-            <th>Rear trk</th><th>Axle</th><th>Tyre F/R</th><th>Best lap</th><th>Feel</th><th></th>
+            <th>Rear trk</th><th>Axle</th><th>Tyres FL/FR · RL/RR</th><th>Best lap</th><th>Feel</th><th></th>
           </tr></thead>
           <tbody id="historyBody"></tbody>
         </table>
@@ -1253,6 +1255,13 @@ function generateRecommendations(track, issue, cond) {
 function recHtml(h, items) {
   return `<div class="rec"><div class="rec-h">${h}</div><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
 }
+/* Render four-corner tyre pressures as "FL/FR · RL/RR", or "—" if none set. */
+function tyrePressureSummary(s) {
+  const vals = [s.tyreFL, s.tyreFR, s.tyreRL, s.tyreRR];
+  if (!vals.some(v => v != null && v !== '')) return '—';
+  const fmt = v => (v == null || v === '') ? '?' : v;
+  return `${fmt(vals[0])}/${fmt(vals[1])} · ${fmt(vals[2])}/${fmt(vals[3])}`;
+}
 function setupLine(s) {
   const p = [];
   if (s.rearTrack) p.push(`rear ${s.rearTrack}mm`);
@@ -1260,7 +1269,8 @@ function setupLine(s) {
   if (s.axle) p.push(`${s.axle} axle`);
   if (s.camberFront) p.push(`camber ${s.camberFront}°`);
   if (s.rideFront || s.rideRear) p.push(`ride ${s.rideFront || '?'}/${s.rideRear || '?'}`);
-  if (s.tyreFront || s.tyreRear) p.push(`tyres ${s.tyreFront || '?'}/${s.tyreRear || '?'} psi`);
+  const tyreSummary = tyrePressureSummary(s);
+  if (tyreSummary !== '—') p.push(`tyres ${tyreSummary} psi`);
   if (s.mainJet) p.push(`jet ${s.mainJet}`);
   if (s.gear) p.push(`gear ${s.gear}`);
   return 'Setup: ' + (p.join(' · ') || 'not recorded') + '.';
@@ -1356,7 +1366,7 @@ function renderHistory() {
       <td data-label="Density">${s.relDensity != null ? round1(s.relDensity) + '%' : '—'}</td>
       <td data-label="Rear track">${s.rearTrack || '—'}</td>
       <td data-label="Axle">${s.axle || '—'}</td>
-      <td data-label="Tyre F/R">${(s.tyreFront || '?') + '/' + (s.tyreRear || '?')}</td>
+      <td data-label="Tyres">${tyrePressureSummary(s)}</td>
       <td data-label="Best lap"><b>${s.bestLap || '—'}</b></td>
       <td data-label="Feel">${s.feel || '—'}</td>
       <td><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="event.stopPropagation();deleteSession('${s.id}')">✕</button></td>
@@ -1368,7 +1378,7 @@ function renderHistory() {
 }
 
 /* ---------------- Form <-> session ---------------- */
-const NUM = ['camberFront', 'frontTrack', 'rearTrack', 'tyreFront', 'tyreRear', 'airTemp', 'trackTemp', 'humidity', 'pressure', 'airDensity', 'relDensity'];
+const NUM = ['camberFront', 'frontTrack', 'rearTrack', 'tyreFL', 'tyreFR', 'tyreRL', 'tyreRR', 'airTemp', 'trackTemp', 'humidity', 'pressure', 'airDensity', 'relDensity'];
 function formToSession(form) {
   const fd = new FormData(form);
   const s = {};
@@ -1647,12 +1657,26 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
 
 /* ---------------- Init ---------------- */
 (function init() {
-  // One-time migration: rename legacy `avgLap` on stored sessions to `theoreticalLap`.
+  // One-time migrations on stored sessions:
+  //  - rename legacy `avgLap` → `theoreticalLap`
+  //  - split legacy two-axle tyre pressures (`tyreFront`/`tyreRear`) into four corners
   let migrated = false;
   sessions.forEach(s => {
     if (Object.prototype.hasOwnProperty.call(s, 'avgLap')) {
       if (s.theoreticalLap == null) s.theoreticalLap = s.avgLap;
       delete s.avgLap;
+      migrated = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(s, 'tyreFront')) {
+      if (s.tyreFL == null) s.tyreFL = s.tyreFront;
+      if (s.tyreFR == null) s.tyreFR = s.tyreFront;
+      delete s.tyreFront;
+      migrated = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(s, 'tyreRear')) {
+      if (s.tyreRL == null) s.tyreRL = s.tyreRear;
+      if (s.tyreRR == null) s.tyreRR = s.tyreRear;
+      delete s.tyreRear;
       migrated = true;
     }
   });
