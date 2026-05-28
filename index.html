@@ -398,6 +398,8 @@
             <div class="field"><label>Axle hardness</label>
               <select name="axle" id="axleSelect"><option value="">—</option><option>Soft</option><option>Medium</option><option>Hard</option></select>
               <div class="hint" id="axleHint" style="display:none;">KR-S = softest · KR-M = middle · KR-HH = hardest.</div></div>
+            <div class="field" id="torsionBarField" style="display:none;"><label>Torsion bar</label>
+              <select name="torsionBar"><option value="">—</option><option>Nylon</option><option>Nylon ribbed</option><option>Chrome</option><option>Teflon</option></select></div>
             <div class="field"><label>Front ride height</label>
               <select name="rideFront"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
             <div class="field"><label>Rear ride height</label>
@@ -1287,6 +1289,7 @@ function setupLine(s) {
   if (s.rearTrack) p.push(`rear ${s.rearTrack}mm`);
   if (s.frontTrack) p.push(`front ${s.frontTrack}mm`);
   if (s.axle) p.push(`${s.axle} axle`);
+  if (s.torsionBar) p.push(`${s.torsionBar.toLowerCase()} torsion bar`);
   if (s.camberFront) p.push(`camber ${s.camberFront}°`);
   if (s.rideFront || s.rideRear) p.push(`ride ${s.rideFront || '?'}/${s.rideRear || '?'}`);
   const tyreSummary = tyrePressureSummary(s);
@@ -1461,6 +1464,15 @@ function updateChassisVisibility() {
   fields.style.display = show ? '' : 'none';
   hint.style.display = show ? 'none' : '';
   updateAxleOptionsForBrand(sel.value);
+  updateTorsionBarVisibility(sel.value);
+}
+
+function updateTorsionBarVisibility(brand) {
+  const field = document.getElementById('torsionBarField');
+  if (!field) return;
+  const isKR = brand === 'Kart Republic';
+  field.style.display = isKR ? '' : 'none';
+  if (!isKR) field.querySelector('select').value = '';
 }
 
 const AXLE_OPTIONS_DEFAULT = ['Soft', 'Medium', 'Hard'];
