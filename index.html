@@ -168,6 +168,19 @@
     height: 1px; background: var(--border); margin: 4px 0;
   }
 
+  /* Favourite-track quick-pick chips on the Log Session form. */
+  .fav-track-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .fav-track-chips:empty { display: none; }
+  .fav-chip {
+    font-size: 12px; padding: 5px 10px;
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 999px;
+    cursor: pointer; font-family: inherit;
+    transition: border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  .fav-chip:hover { border-color: #ffd14a; color: #ffd14a; background: rgba(255,209,74,0.06); }
+  .fav-chip .star { color: #ffd14a; margin-right: 4px; }
+
   button.btn {
     background: var(--accent); color: #fff; border: none; border-radius: 8px;
     padding: 11px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
@@ -326,7 +339,11 @@
         <h3>🏁 Session</h3>
         <div class="grid cols-4">
           <div class="field"><label>Date</label><input type="date" name="date" required></div>
-          <div class="field" style="grid-column: span 2;"><label>Track</label><input name="track" list="trackList" placeholder="Circuit name" required></div>
+          <div class="field" style="grid-column: span 2;">
+            <label>Track</label>
+            <input name="track" list="trackList" placeholder="Circuit name" required>
+            <div class="fav-track-chips" id="logFavTracks"></div>
+          </div>
           <div class="field"><label>Class / Kart</label><input name="kart" placeholder="e.g. Rotax Senior"></div>
         </div>
         <datalist id="trackList"></datalist>
@@ -809,6 +826,18 @@ function toggleFavTrack(name) {
   const i = settings.favTracks.indexOf(name);
   if (i >= 0) settings.favTracks.splice(i, 1); else settings.favTracks.push(name);
   save();
+  renderFavTrackChips();
+}
+
+/* Quick-pick chips on the Log Session form for one-click track selection. */
+function renderFavTrackChips() {
+  const box = document.getElementById('logFavTracks');
+  if (!box) return;
+  if (!settings.favTracks.length) { box.innerHTML = ''; return; }
+  box.innerHTML = settings.favTracks
+    .slice().sort((a, b) => a.localeCompare(b))
+    .map(name => `<button type="button" class="fav-chip" data-track="${escapeAttr(name)}"><span class="star">★</span>${escapeHtml(name)}</button>`)
+    .join('');
 }
 
 /* The dashboard "Circuit / town" dropdown — countries expand to show tracks.
@@ -1525,6 +1554,13 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
   // default date = today
   document.getElementById('logForm').date.value = new Date().toISOString().slice(0, 10);
   populateCircuitDropdown();
+  renderFavTrackChips();
+  document.getElementById('logFavTracks').addEventListener('click', e => {
+    const chip = e.target.closest('.fav-chip');
+    if (!chip) return;
+    const input = document.querySelector('#logForm input[name="track"]');
+    if (input) { input.value = chip.dataset.track; input.focus(); }
+  });
   renderHistory();
   if (settings.location) {
     document.getElementById('circuitLabel').textContent = settings.location.name || '— Select a circuit —';
