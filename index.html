@@ -396,7 +396,7 @@
         <h3>⏱️ Performance</h3>
         <div class="grid cols-4">
           <div class="field"><label>Best lap</label><input name="bestLap" placeholder="45.231 or 1:02.4"></div>
-          <div class="field"><label>Avg lap</label><input name="avgLap" placeholder="optional"></div>
+          <div class="field"><label>Theoretical lap</label><input name="theoreticalLap" placeholder="optional"></div>
           <div class="field"><label>Balance / feel</label>
             <select name="feel"><option value="">—</option><option>Understeer</option><option>Balanced</option><option>Oversteer / loose</option><option>Hopping</option><option>Snappy</option></select></div>
           <div class="field"><label>Speed rating</label>
@@ -1606,6 +1606,17 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
 
 /* ---------------- Init ---------------- */
 (function init() {
+  // One-time migration: rename legacy `avgLap` on stored sessions to `theoreticalLap`.
+  let migrated = false;
+  sessions.forEach(s => {
+    if (Object.prototype.hasOwnProperty.call(s, 'avgLap')) {
+      if (s.theoreticalLap == null) s.theoreticalLap = s.avgLap;
+      delete s.avgLap;
+      migrated = true;
+    }
+  });
+  if (migrated) save();
+
   // default date = today
   document.getElementById('logForm').date.value = new Date().toISOString().slice(0, 10);
   populateCircuitDropdown();
