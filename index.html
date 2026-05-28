@@ -168,8 +168,13 @@
     height: 1px; background: var(--border); margin: 4px 0;
   }
 
-  /* Favourite-track picker dropdown on the Log Session form. */
-  .fav-track-select { margin-top: 8px; }
+  /* Track input acting as a cascading-dropdown trigger on the Log Session form. */
+  .circuit-input { padding-right: 36px !important; }
+  .circuit-input-caret {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); pointer-events: none; font-size: 13px;
+  }
+  .circuit-dropdown:focus-within .circuit-input-caret { color: var(--text); }
 
   button.btn {
     background: var(--accent); color: #fff; border: none; border-radius: 8px;
@@ -331,8 +336,11 @@
           <div class="field"><label>Date</label><input type="date" name="date" required></div>
           <div class="field" style="grid-column: span 2;">
             <label>Track</label>
-            <input name="track" list="trackList" placeholder="Circuit name" required>
-            <select id="logFavTrackSelect" class="fav-track-select" style="display:none;"></select>
+            <div class="circuit-dropdown" id="logTrackDropdown">
+              <input class="circuit-input" type="text" name="track" id="logTrackInput" placeholder="Click to browse, or type a custom name" required autocomplete="off">
+              <span class="circuit-input-caret">▾</span>
+              <div class="circuit-menu" id="logTrackMenu" hidden></div>
+            </div>
           </div>
           <div class="field"><label>Class / Kart</label><input name="kart" placeholder="e.g. Rotax Senior"></div>
         </div>
@@ -816,78 +824,51 @@ function toggleFavTrack(name) {
   const i = settings.favTracks.indexOf(name);
   if (i >= 0) settings.favTracks.splice(i, 1); else settings.favTracks.push(name);
   save();
-  renderFavTrackPicker();
+  populateCircuitDropdown();
+  populateLogTrackDropdown();
 }
 
-/* Favourite-track picker dropdown on the Log Session form — populated from
-   settings.favTracks, hidden entirely when the user has no favourites. */
-function renderFavTrackPicker() {
-  const sel = document.getElementById('logFavTrackSelect');
-  if (!sel) return;
-  if (!settings.favTracks.length) {
-    sel.style.display = 'none';
-    sel.innerHTML = '';
-    return;
-  }
-  sel.style.display = '';
-  const opts = settings.favTracks.slice().sort((a, b) => a.localeCompare(b))
-    .map(name => `<option value="${escapeHtml(name)}">★ ${escapeHtml(name)}</option>`)
-    .join('');
-  sel.innerHTML = `<option value="">— Select favourite track —</option>${opts}`;
-}
-
-/* The dashboard "Circuit / town" dropdown — countries expand to show tracks.
-   Favourited tracks pin to the top within each country AND surface in a
-   "★ Favourites" section at the very top. Countries themselves sort alpha. */
-function populateCircuitDropdown() {
-  const menu = document.getElementById('circuitMenu');
-  if (!menu) return;
-
-  // Remember which countries are currently open so we can restore after re-render.
-  const openCcs = new Set([...menu.querySelectorAll('.circuit-country.open')].map(el => el.dataset.cc));
-
+/* Shared renderer for a cascading track menu (favourites pinned, then countries).
+   Returns the HTML string; callers set it on their menu element. */
+function buildTrackMenuHtml(openCcs, opts) {
   const byCountry = new Map();
   KART_TRACKS.forEach((t, i) => {
     if (!byCountry.has(t.cc)) byCountry.set(t.cc, []);
     byCountry.get(t.cc).push({ ...t, _i: i });
   });
-
   const entries = [...byCountry.entries()].sort((a, b) => {
     const na = COUNTRY_NAMES[a[0]] || a[0];
     const nb = COUNTRY_NAMES[b[0]] || b[0];
     return na.localeCompare(nb);
   });
 
-  // "★ Favourites" pinned section — flat list of every favourited track.
-  const favTrackEntries = [];
-  KART_TRACKS.forEach((t, i) => { if (isFavTrack(t.name)) favTrackEntries.push({ ...t, _i: i }); });
-  favTrackEntries.sort((a, b) => a.name.localeCompare(b.name));
+  const trackRow = (t, attrs) => {
+    const on = isFavTrack(t.name);
+    return `<div class="circuit-track" ${attrs}>`
+      + `<span class="fav-star ${on ? 'on' : ''}" data-fav-track="${escapeAttr(t.name)}" title="${on ? 'Remove from favourites' : 'Add to favourites'}">${on ? '★' : '☆'}</span>`
+      + `<span class="track-name">${escapeHtml(t.name)}${t.town ? `<span class="town">${escapeHtml(t.town)}</span>` : ''}</span>`
+      + `</div>`;
+  };
+
+  // Pinned favourite tracks
+  const favs = [];
+  KART_TRACKS.forEach((t, i) => { if (isFavTrack(t.name)) favs.push({ ...t, _i: i }); });
+  favs.sort((a, b) => a.name.localeCompare(b.name));
   let favSection = '';
-  if (favTrackEntries.length) {
-    const rows = favTrackEntries.map(t =>
-      `<div class="circuit-track" data-index="${t._i}">`
-      + `<span class="fav-star on" data-fav-track="${escapeAttr(t.name)}" title="Remove from favourites">★</span>`
-      + `<span class="track-name">${escapeHtml(t.name)}<span class="town">${escapeHtml(t.town)}</span></span>`
-      + `</div>`
-    ).join('');
+  if (favs.length) {
+    const rows = favs.map(t => trackRow(t, opts.trackAttrs(t))).join('');
     favSection = `<div class="circuit-fav-header">★ Favourite tracks</div>${rows}<div class="circuit-divider"></div>`;
   }
 
   const countriesHtml = entries.map(([cc, tracks]) => {
     const countryName = COUNTRY_NAMES[cc] || cc;
-    const sortedTracks = tracks.slice().sort((a, b) => {
+    const sorted = tracks.slice().sort((a, b) => {
       const fa = isFavTrack(a.name);
       const fb = isFavTrack(b.name);
       if (fa !== fb) return fa ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
-    const tracksHtml = sortedTracks.map(t => {
-      const on = isFavTrack(t.name);
-      return `<div class="circuit-track" data-index="${t._i}">`
-        + `<span class="fav-star ${on ? 'on' : ''}" data-fav-track="${escapeAttr(t.name)}" title="${on ? 'Remove from favourites' : 'Add to favourites'}">${on ? '★' : '☆'}</span>`
-        + `<span class="track-name">${escapeHtml(t.name)}<span class="town">${escapeHtml(t.town)}</span></span>`
-        + `</div>`;
-    }).join('');
+    const tracksHtml = sorted.map(t => trackRow(t, opts.trackAttrs(t))).join('');
     const isOpen = openCcs.has(cc);
     return `<div class="circuit-country ${isOpen ? 'open' : ''}" data-cc="${escapeHtml(cc)}">`
       + `<span>${escapeHtml(countryName)}<span class="count">${tracks.length}</span></span>`
@@ -896,7 +877,45 @@ function populateCircuitDropdown() {
       + `<div class="circuit-tracks ${isOpen ? 'open' : ''}" data-cc="${escapeHtml(cc)}">${tracksHtml}</div>`;
   }).join('');
 
-  menu.innerHTML = favSection + countriesHtml;
+  // Append custom / historical tracks not in the directory
+  let customSection = '';
+  if (opts.includeCustom) {
+    const directorySet = new Set(KART_TRACKS.map(t => t.name));
+    const customNames = [...new Set(sessions.map(s => s.track).filter(n => n && !directorySet.has(n)))]
+      .sort((a, b) => a.localeCompare(b));
+    if (customNames.length) {
+      const rows = customNames.map(name =>
+        trackRow({ name, town: '' }, opts.trackAttrs({ name, town: '', _i: -1 }))
+      ).join('');
+      customSection = `<div class="circuit-divider"></div><div class="circuit-fav-header" style="color: var(--muted);">Custom / Other tracks</div>${rows}`;
+    }
+  }
+
+  return favSection + countriesHtml + customSection;
+}
+
+/* Log Session "Track" picker — same cascading UI as Conditions, but selecting
+   a track fills the form input instead of loading weather. */
+function populateLogTrackDropdown() {
+  const menu = document.getElementById('logTrackMenu');
+  if (!menu) return;
+  const openCcs = new Set([...menu.querySelectorAll('.circuit-country.open')].map(el => el.dataset.cc));
+  menu.innerHTML = buildTrackMenuHtml(openCcs, {
+    includeCustom: true,
+    trackAttrs: t => `data-name="${escapeAttr(t.name)}"`,
+  });
+}
+
+/* The dashboard "Circuit / town" dropdown — countries expand to show tracks.
+   Selecting a track loads its weather (via data-index → pickTrack). */
+function populateCircuitDropdown() {
+  const menu = document.getElementById('circuitMenu');
+  if (!menu) return;
+  const openCcs = new Set([...menu.querySelectorAll('.circuit-country.open')].map(el => el.dataset.cc));
+  menu.innerHTML = buildTrackMenuHtml(openCcs, {
+    includeCustom: false,
+    trackAttrs: t => `data-index="${t._i}"`,
+  });
 }
 /* Resolve a directory track to a location and load its weather. */
 window.pickTrack = async function (i) {
@@ -1318,8 +1337,9 @@ function renderHistory() {
       <td><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="event.stopPropagation();deleteSession('${s.id}')">✕</button></td>
     </tr>`).join('');
 
-  // refresh the track autocomplete (built-in directory + your logged tracks)
+  // refresh the track autocomplete (used by Recommendations) and the Log Session picker
   populateTrackList();
+  populateLogTrackDropdown();
 }
 
 /* ---------------- Form <-> session ---------------- */
@@ -1355,6 +1375,45 @@ function showView(id, btn) {
 }
 
 function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
+
+// Log Session "Track" picker — same cascading menu, but selecting a track
+// fills the input value instead of loading weather. The input itself is the
+// trigger (also lets users type a custom name).
+function wireLogTrackDropdown() {
+  const input = document.getElementById('logTrackInput');
+  const menu = document.getElementById('logTrackMenu');
+  const dd = document.getElementById('logTrackDropdown');
+  if (!input || !menu || !dd) return;
+  const setOpen = open => { menu.hidden = !open; };
+  input.addEventListener('focus', () => setOpen(true));
+  input.addEventListener('click', e => { e.stopPropagation(); setOpen(true); });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { setOpen(false); input.blur(); }
+  });
+  document.addEventListener('click', e => {
+    if (!dd.contains(e.target)) setOpen(false);
+  });
+  menu.addEventListener('click', e => {
+    const star = e.target.closest('.fav-star');
+    if (star && star.dataset.favTrack) {
+      e.stopPropagation();
+      toggleFavTrack(star.dataset.favTrack);
+      return;
+    }
+    const country = e.target.closest('.circuit-country');
+    if (country) {
+      country.classList.toggle('open');
+      const tracks = country.nextElementSibling;
+      if (tracks && tracks.classList.contains('circuit-tracks')) tracks.classList.toggle('open');
+      return;
+    }
+    const track = e.target.closest('.circuit-track');
+    if (track && track.dataset.name) {
+      input.value = track.dataset.name;
+      setOpen(false);
+    }
+  });
+}
 
 // Cascading circuit dropdown — click trigger to open, click a country to expand, click a track to load it.
 (function wireCircuitDropdown() {
@@ -1550,13 +1609,8 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
   // default date = today
   document.getElementById('logForm').date.value = new Date().toISOString().slice(0, 10);
   populateCircuitDropdown();
-  renderFavTrackPicker();
-  document.getElementById('logFavTrackSelect').addEventListener('change', e => {
-    if (!e.target.value) return;
-    const input = document.querySelector('#logForm input[name="track"]');
-    if (input) { input.value = e.target.value; input.focus(); }
-    e.target.value = '';
-  });
+  populateLogTrackDropdown();
+  wireLogTrackDropdown();
   renderHistory();
   if (settings.location) {
     document.getElementById('circuitLabel').textContent = settings.location.name || '— Select a circuit —';
