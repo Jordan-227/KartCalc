@@ -349,28 +349,43 @@
 
       <div class="card">
         <h3>🔧 Chassis Setup</h3>
-        <div class="grid cols-4">
-          <div class="field"><label>Front camber (°)</label><input type="number" step="0.1" name="camberFront" placeholder="-1.0"></div>
-          <div class="field"><label>Caster</label>
-            <select name="caster"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
-          <div class="field"><label>Front track (mm)</label><input type="number" step="1" name="frontTrack" placeholder="1250"></div>
-          <div class="field"><label>Rear track (mm)</label><input type="number" step="1" name="rearTrack" placeholder="1400"></div>
+        <div class="field" style="margin-bottom: 14px;">
+          <label>Chassis brand</label>
+          <select name="chassisBrand" id="chassisBrand">
+            <option value="">— Select chassis brand —</option>
+            <option>TonyKart</option>
+            <option>Pantano Kart</option>
+            <option>Kart Republic</option>
+          </select>
+          <div class="hint">Setup fields are the same across brands for now — brand-specific options will land later.</div>
+        </div>
+        <div id="chassisHint" class="empty" style="padding: 20px; font-size: 13px;">
+          Pick a chassis brand above to log this session's setup.
+        </div>
+        <div id="chassisFields" style="display:none;">
+          <div class="grid cols-4">
+            <div class="field"><label>Front camber (°)</label><input type="number" step="0.1" name="camberFront" placeholder="-1.0"></div>
+            <div class="field"><label>Caster</label>
+              <select name="caster"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
+            <div class="field"><label>Front track (mm)</label><input type="number" step="1" name="frontTrack" placeholder="1250"></div>
+            <div class="field"><label>Rear track (mm)</label><input type="number" step="1" name="rearTrack" placeholder="1400"></div>
 
-          <div class="field"><label>Axle hardness</label>
-            <select name="axle"><option value="">—</option><option>Soft</option><option>Medium</option><option>Hard</option></select></div>
-          <div class="field"><label>Front ride height</label>
-            <select name="rideFront"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
-          <div class="field"><label>Rear ride height</label>
-            <select name="rideRear"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
-          <div class="field"><label>Seat position</label>
-            <select name="seat"><option value="">—</option><option>Forward</option><option>Standard</option><option>Back</option><option>Lower</option><option>Higher</option></select></div>
+            <div class="field"><label>Axle hardness</label>
+              <select name="axle"><option value="">—</option><option>Soft</option><option>Medium</option><option>Hard</option></select></div>
+            <div class="field"><label>Front ride height</label>
+              <select name="rideFront"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
+            <div class="field"><label>Rear ride height</label>
+              <select name="rideRear"><option value="">—</option><option>Low</option><option>Medium</option><option>High</option></select></div>
+            <div class="field"><label>Seat position</label>
+              <select name="seat"><option value="">—</option><option>Forward</option><option>Standard</option><option>Back</option><option>Lower</option><option>Higher</option></select></div>
 
-          <div class="field"><label>Tyre press. front (psi)</label><input type="number" step="0.1" name="tyreFront" placeholder="11.0"></div>
-          <div class="field"><label>Tyre press. rear (psi)</label><input type="number" step="0.1" name="tyreRear" placeholder="11.0"></div>
-          <div class="field"><label>Tyre compound</label><input name="compound" placeholder="e.g. MOJO D5"></div>
-          <div class="field"><label>Gearing</label><input name="gear" placeholder="e.g. 11 / 82"></div>
+            <div class="field"><label>Tyre press. front (psi)</label><input type="number" step="0.1" name="tyreFront" placeholder="11.0"></div>
+            <div class="field"><label>Tyre press. rear (psi)</label><input type="number" step="0.1" name="tyreRear" placeholder="11.0"></div>
+            <div class="field"><label>Tyre compound</label><input name="compound" placeholder="e.g. MOJO D5"></div>
+            <div class="field"><label>Gearing</label><input name="gear" placeholder="e.g. 11 / 82"></div>
 
-          <div class="field"><label>Main jet</label><input name="mainJet" placeholder="e.g. 118"></div>
+            <div class="field"><label>Main jet</label><input name="mainJet" placeholder="e.g. 118"></div>
+          </div>
         </div>
       </div>
 
@@ -1360,6 +1375,21 @@ function fillForm(s) {
   const form = document.getElementById('logForm');
   form.reset();
   Object.entries(s).forEach(([k, v]) => { if (form.elements[k] && v != null) form.elements[k].value = v; });
+  updateChassisVisibility();
+}
+
+/* Show the chassis setup fields only when a brand is selected, OR when
+   editing an older session that has setup data but no brand recorded. */
+function updateChassisVisibility() {
+  const sel = document.getElementById('chassisBrand');
+  const fields = document.getElementById('chassisFields');
+  const hint = document.getElementById('chassisHint');
+  if (!sel || !fields || !hint) return;
+  const hasBrand = !!sel.value;
+  const fieldHasValue = !hasBrand && [...fields.querySelectorAll('input, select')].some(el => el.value !== '');
+  const show = hasBrand || fieldHasValue;
+  fields.style.display = show ? '' : 'none';
+  hint.style.display = show ? 'none' : '';
 }
 
 /* ---------------- Events ---------------- */
@@ -1525,6 +1555,7 @@ document.getElementById('logForm').addEventListener('submit', e => {
   }
   editingId = null; document.getElementById('editingNote').style.display = 'none';
   save(); renderHistory(); e.target.reset();
+  updateChassisVisibility();
   showView('history');
 });
 
@@ -1622,6 +1653,8 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
   populateCircuitDropdown();
   populateLogTrackDropdown();
   wireLogTrackDropdown();
+  document.getElementById('chassisBrand').addEventListener('change', updateChassisVisibility);
+  updateChassisVisibility();
   renderHistory();
   if (settings.location) {
     document.getElementById('circuitLabel').textContent = settings.location.name || '— Select a circuit —';
