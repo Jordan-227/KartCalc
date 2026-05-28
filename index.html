@@ -168,18 +168,8 @@
     height: 1px; background: var(--border); margin: 4px 0;
   }
 
-  /* Favourite-track quick-pick chips on the Log Session form. */
-  .fav-track-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .fav-track-chips:empty { display: none; }
-  .fav-chip {
-    font-size: 12px; padding: 5px 10px;
-    background: var(--panel-2); color: var(--text);
-    border: 1px solid var(--border); border-radius: 999px;
-    cursor: pointer; font-family: inherit;
-    transition: border-color .15s ease, color .15s ease, background .15s ease;
-  }
-  .fav-chip:hover { border-color: #ffd14a; color: #ffd14a; background: rgba(255,209,74,0.06); }
-  .fav-chip .star { color: #ffd14a; margin-right: 4px; }
+  /* Favourite-track picker dropdown on the Log Session form. */
+  .fav-track-select { margin-top: 8px; }
 
   button.btn {
     background: var(--accent); color: #fff; border: none; border-radius: 8px;
@@ -342,7 +332,7 @@
           <div class="field" style="grid-column: span 2;">
             <label>Track</label>
             <input name="track" list="trackList" placeholder="Circuit name" required>
-            <div class="fav-track-chips" id="logFavTracks"></div>
+            <select id="logFavTrackSelect" class="fav-track-select" style="display:none;"></select>
           </div>
           <div class="field"><label>Class / Kart</label><input name="kart" placeholder="e.g. Rotax Senior"></div>
         </div>
@@ -826,18 +816,24 @@ function toggleFavTrack(name) {
   const i = settings.favTracks.indexOf(name);
   if (i >= 0) settings.favTracks.splice(i, 1); else settings.favTracks.push(name);
   save();
-  renderFavTrackChips();
+  renderFavTrackPicker();
 }
 
-/* Quick-pick chips on the Log Session form for one-click track selection. */
-function renderFavTrackChips() {
-  const box = document.getElementById('logFavTracks');
-  if (!box) return;
-  if (!settings.favTracks.length) { box.innerHTML = ''; return; }
-  box.innerHTML = settings.favTracks
-    .slice().sort((a, b) => a.localeCompare(b))
-    .map(name => `<button type="button" class="fav-chip" data-track="${escapeAttr(name)}"><span class="star">★</span>${escapeHtml(name)}</button>`)
+/* Favourite-track picker dropdown on the Log Session form — populated from
+   settings.favTracks, hidden entirely when the user has no favourites. */
+function renderFavTrackPicker() {
+  const sel = document.getElementById('logFavTrackSelect');
+  if (!sel) return;
+  if (!settings.favTracks.length) {
+    sel.style.display = 'none';
+    sel.innerHTML = '';
+    return;
+  }
+  sel.style.display = '';
+  const opts = settings.favTracks.slice().sort((a, b) => a.localeCompare(b))
+    .map(name => `<option value="${escapeHtml(name)}">★ ${escapeHtml(name)}</option>`)
     .join('');
+  sel.innerHTML = `<option value="">— Select favourite track —</option>${opts}`;
 }
 
 /* The dashboard "Circuit / town" dropdown — countries expand to show tracks.
@@ -1554,12 +1550,12 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
   // default date = today
   document.getElementById('logForm').date.value = new Date().toISOString().slice(0, 10);
   populateCircuitDropdown();
-  renderFavTrackChips();
-  document.getElementById('logFavTracks').addEventListener('click', e => {
-    const chip = e.target.closest('.fav-chip');
-    if (!chip) return;
+  renderFavTrackPicker();
+  document.getElementById('logFavTrackSelect').addEventListener('change', e => {
+    if (!e.target.value) return;
     const input = document.querySelector('#logForm input[name="track"]');
-    if (input) { input.value = chip.dataset.track; input.focus(); }
+    if (input) { input.value = e.target.value; input.focus(); }
+    e.target.value = '';
   });
   renderHistory();
   if (settings.location) {
