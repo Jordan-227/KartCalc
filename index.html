@@ -106,6 +106,43 @@
   .field { margin-bottom: 0; }
   .field .hint { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: none; letter-spacing: 0; font-weight: 400; }
 
+  /* Cascading circuit dropdown (countries → tracks) */
+  .circuit-dropdown { position: relative; }
+  .circuit-trigger {
+    width: 100%; text-align: left; cursor: pointer;
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-size: 16px; font-family: inherit;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .circuit-trigger:hover { border-color: var(--accent); }
+  .circuit-trigger .caret { color: var(--muted); margin-left: 8px; transition: transform .15s ease; }
+  .circuit-trigger[aria-expanded="true"] .caret { transform: rotate(180deg); }
+  .circuit-menu {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: var(--shadow);
+    max-height: 360px; overflow-y: auto;
+    z-index: 30; padding: 4px 0;
+  }
+  .circuit-country {
+    padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    color: var(--text); user-select: none;
+  }
+  .circuit-country:hover { background: var(--panel); }
+  .circuit-country .arrow { color: var(--muted); transition: transform .15s ease; font-size: 12px; }
+  .circuit-country.open .arrow { transform: rotate(90deg); }
+  .circuit-country .count { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .circuit-tracks { display: none; background: rgba(0,0,0,0.18); }
+  .circuit-tracks.open { display: block; }
+  .circuit-track {
+    padding: 8px 14px 8px 30px; cursor: pointer; color: var(--text);
+    font-size: 14px;
+  }
+  .circuit-track:hover { background: var(--panel); }
+  .circuit-track .town { color: var(--muted); font-size: 12px; margin-left: 6px; }
+
   button.btn {
     background: var(--accent); color: #fff; border: none; border-radius: 8px;
     padding: 11px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
@@ -234,23 +271,19 @@
 
     <div class="card">
       <h3>📍 Location</h3>
-      <div class="grid cols-3">
-        <div class="field" style="grid-column: span 2;">
-          <label for="cityInput">Circuit / town</label>
-          <input id="cityInput" placeholder="e.g. PFI Grantham, Las Vegas, Genk…" />
-          <div class="hint">Type a place and press Search, or use your device location.</div>
+      <div class="field">
+        <label>Circuit / town</label>
+        <div class="circuit-dropdown" id="circuitDropdown">
+          <button type="button" class="circuit-trigger" id="circuitTrigger" aria-expanded="false">
+            <span id="circuitLabel">— Select a circuit —</span>
+            <span class="caret">▾</span>
+          </button>
+          <div class="circuit-menu" id="circuitMenu" hidden></div>
         </div>
-        <div class="field" style="display:flex; align-items:flex-end; gap:8px;">
-          <button class="btn" id="searchBtn">Search</button>
-          <button class="btn secondary" id="geoBtn">📡 My location</button>
-        </div>
+        <div class="hint">Browse circuits by country — pick one to load its local weather.</div>
       </div>
-      <div class="field" style="margin-top:14px;">
-        <label for="trackSelect">Or pick a known circuit</label>
-        <select id="trackSelect">
-          <option value="">— Browse kart tracks —</option>
-        </select>
-        <div class="hint">Built-in directory of kart circuits worldwide — selecting one loads its local weather.</div>
+      <div class="field" style="margin-top:12px;">
+        <button class="btn secondary" id="geoBtn">📡 Use my current location</button>
       </div>
       <div id="geoResults" style="margin-top:10px;"></div>
     </div>
@@ -730,22 +763,42 @@ function populateTrackList() {
   const dl = document.getElementById('trackList');
   if (dl) dl.innerHTML = allTrackNames().map(t => `<option value="${escapeHtml(t)}">`).join('');
 }
-/* The dashboard "Browse kart tracks" dropdown, grouped by region. */
-function populateTrackSelect() {
-  const sel = document.getElementById('trackSelect');
-  if (!sel) return;
-  let html = '<option value="">— Browse kart tracks —</option>';
-  let region = null;
+/* Country code → display name for the cascading circuit dropdown. */
+const COUNTRY_NAMES = {
+  AU: 'Australia', GB: 'United Kingdom', IE: 'Ireland',
+  IT: 'Italy', FR: 'France', ES: 'Spain', PT: 'Portugal',
+  DE: 'Germany', BE: 'Belgium', NL: 'Netherlands',
+  SE: 'Sweden', DK: 'Denmark', NO: 'Norway', FI: 'Finland',
+  CZ: 'Czech Republic', RS: 'Serbia', AT: 'Austria',
+  BH: 'Bahrain', AE: 'United Arab Emirates',
+  US: 'United States', CA: 'Canada',
+  BR: 'Brazil', AR: 'Argentina',
+  JP: 'Japan', MY: 'Malaysia', CN: 'China', MO: 'Macau', IN: 'India',
+  NZ: 'New Zealand',
+};
+
+/* The dashboard "Circuit / town" dropdown — countries expand to show tracks. */
+function populateCircuitDropdown() {
+  const menu = document.getElementById('circuitMenu');
+  if (!menu) return;
+  const byCountry = new Map();
   KART_TRACKS.forEach((t, i) => {
-    if (t.region !== region) {
-      if (region !== null) html += '</optgroup>';
-      html += `<optgroup label="${escapeHtml(t.region)}">`;
-      region = t.region;
-    }
-    html += `<option value="${i}">${escapeHtml(t.name)}</option>`;
+    if (!byCountry.has(t.cc)) byCountry.set(t.cc, []);
+    byCountry.get(t.cc).push({ ...t, _i: i });
   });
-  if (region !== null) html += '</optgroup>';
-  sel.innerHTML = html;
+  const entries = [...byCountry.entries()].sort((a, b) => {
+    const na = COUNTRY_NAMES[a[0]] || a[0];
+    const nb = COUNTRY_NAMES[b[0]] || b[0];
+    return na.localeCompare(nb);
+  });
+  menu.innerHTML = entries.map(([cc, tracks]) => {
+    const countryName = COUNTRY_NAMES[cc] || cc;
+    const tracksHtml = tracks
+      .slice().sort((a, b) => a.name.localeCompare(b.name))
+      .map(t => `<div class="circuit-track" data-index="${t._i}">${escapeHtml(t.name)}<span class="town">${escapeHtml(t.town)}</span></div>`)
+      .join('');
+    return `<div class="circuit-country" data-cc="${escapeHtml(cc)}"><span>${escapeHtml(countryName)}<span class="count">${tracks.length}</span></span><span class="arrow">▸</span></div><div class="circuit-tracks" data-cc="${escapeHtml(cc)}">${tracksHtml}</div>`;
+  }).join('');
 }
 /* Resolve a directory track to a location and load its weather. */
 window.pickTrack = async function (i) {
@@ -761,7 +814,7 @@ window.pickTrack = async function (i) {
     const r = cand[0];
     if (!r) { box.innerHTML = '<span class="note" style="color:var(--bad)">Couldn\'t locate this track\'s weather — try the search box above.</span>'; return; }
     settings.location = { lat: r.latitude, lon: r.longitude, name: t.name };
-    document.getElementById('cityInput').value = t.name;
+    document.getElementById('circuitLabel').textContent = t.name;
     await refreshWeather();
     box.innerHTML = '';
     save();
@@ -1203,33 +1256,46 @@ function showView(id, btn) {
   window.scrollTo({ top: 0 });
 }
 
-// location search
-document.getElementById('searchBtn').addEventListener('click', doSearch);
-document.getElementById('cityInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
-async function doSearch() {
-  const name = document.getElementById('cityInput').value.trim();
-  if (!name) return;
-  const box = document.getElementById('geoResults');
-  box.innerHTML = '<span class="note">Searching…</span>';
-  try {
-    const results = await geocode(name);
-    if (!results.length) { box.innerHTML = '<span class="note">No matches — try a nearby town.</span>'; return; }
-    box.innerHTML = results.map((r, i) =>
-      `<button class="btn secondary" style="margin:4px 6px 0 0;" onclick="pickPlace(${r.latitude},${r.longitude},'${escapeAttr((r.name) + (r.admin1 ? ', ' + r.admin1 : '') + (r.country ? ', ' + r.country : ''))}')">${escapeHtml(r.name)}${r.admin1 ? ', ' + escapeHtml(r.admin1) : ''} <span class="pill">${escapeHtml(r.country || '')}</span></button>`
-    ).join('');
-  } catch (e) { box.innerHTML = '<span class="note" style="color:var(--bad)">Search failed — check your connection.</span>'; }
-}
 function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
 
-// pick a track from the built-in directory dropdown
-document.getElementById('trackSelect').addEventListener('change', e => {
-  const i = e.target.value;
-  if (i !== '') { pickTrack(parseInt(i, 10)); e.target.value = ''; }
-});
+// Cascading circuit dropdown — click trigger to open, click a country to expand, click a track to load it.
+(function wireCircuitDropdown() {
+  const trigger = document.getElementById('circuitTrigger');
+  const menu = document.getElementById('circuitMenu');
+  const dd = document.getElementById('circuitDropdown');
+  if (!trigger || !menu || !dd) return;
+  const setOpen = open => {
+    menu.hidden = !open;
+    trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    setOpen(menu.hidden);
+  });
+  document.addEventListener('click', e => {
+    if (!dd.contains(e.target)) setOpen(false);
+  });
+  menu.addEventListener('click', e => {
+    const country = e.target.closest('.circuit-country');
+    if (country) {
+      country.classList.toggle('open');
+      const tracks = country.nextElementSibling;
+      if (tracks && tracks.classList.contains('circuit-tracks')) tracks.classList.toggle('open');
+      return;
+    }
+    const track = e.target.closest('.circuit-track');
+    if (track) {
+      const i = parseInt(track.dataset.index, 10);
+      setOpen(false);
+      pickTrack(i);
+    }
+  });
+})();
 
 window.pickPlace = async function (lat, lon, label) {
   document.getElementById('geoResults').innerHTML = '<span class="note">Loading weather…</span>';
   settings.location = { lat, lon, name: label };
+  document.getElementById('circuitLabel').textContent = label;
   await refreshWeather();
   document.getElementById('geoResults').innerHTML = '';
   save();
@@ -1377,10 +1443,10 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
 (function init() {
   // default date = today
   document.getElementById('logForm').date.value = new Date().toISOString().slice(0, 10);
-  populateTrackSelect();
+  populateCircuitDropdown();
   renderHistory();
   if (settings.location) {
-    document.getElementById('cityInput').value = settings.location.name || '';
+    document.getElementById('circuitLabel').textContent = settings.location.name || '— Select a circuit —';
     // show cached weather instantly, then refresh
     if (settings.lastWeather) renderWeather(settings.lastWeather.data, settings.lastWeather.name);
     refreshWeather();
