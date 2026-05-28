@@ -110,6 +110,11 @@
     text-transform: uppercase; letter-spacing: .4px;
     padding: 6px 0 2px; border-top: 1px solid var(--border); margin-top: 4px;
   }
+  .unit-select {
+    width: auto; padding: 4px 28px 4px 10px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0;
+    text-transform: none;
+  }
 
   /* Cascading circuit dropdown (countries → tracks) */
   .circuit-dropdown { position: relative; }
@@ -414,7 +419,14 @@
             <div class="field"><label>Tyre compound</label><input name="compound" list="compoundOptions" placeholder="Lecont LPM"><datalist id="compoundOptions"><option value="Lecont LPM"><option value="Lecont LH03"><option value="Lecont LOH"></datalist></div>
             <div class="field"><label>Gearing</label><input name="gear" placeholder="e.g. 11 / 82"></div>
 
-            <div class="subhead" style="grid-column: span 4;">Tyre pressure (psi)</div>
+            <div class="subhead" style="grid-column: span 4; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+              <span>Tyre pressure</span>
+              <select id="tyreUnitSelect" class="unit-select" aria-label="Tyre pressure unit">
+                <option value="psi">PSI</option>
+                <option value="bar">bar</option>
+                <option value="kpa">kPa</option>
+              </select>
+            </div>
             <div class="field"><label>Front left</label><input type="number" step="0.1" name="tyreFL" placeholder="10.0"></div>
             <div class="field"><label>Front right</label><input type="number" step="0.1" name="tyreFR" placeholder="10.0"></div>
             <div class="field"><label>Rear left</label><input type="number" step="0.1" name="tyreRL" placeholder="10.0"></div>
@@ -1277,12 +1289,70 @@ function generateRecommendations(track, issue, cond) {
 function recHtml(h, items) {
   return `<div class="rec"><div class="rec-h">${h}</div><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
 }
-/* Render four-corner tyre pressures as "FL/FR · RL/RR", or "—" if none set. */
+/* Tyre pressure unit options + conversions. PSI is the canonical pivot. */
+const TYRE_UNITS = {
+  psi: { label: 'PSI', step: '0.1', placeholder: '10.0', decimals: 1 },
+  bar: { label: 'bar', step: '0.01', placeholder: '0.69', decimals: 2 },
+  kpa: { label: 'kPa', step: '1', placeholder: '69', decimals: 0 },
+};
+const PSI_PER_BAR = 14.5038;
+const PSI_PER_KPA = 0.145038;
+function convertTyreValue(value, fromUnit, toUnit) {
+  if (fromUnit === toUnit) return value;
+  let psi = value;
+  if (fromUnit === 'bar') psi = value * PSI_PER_BAR;
+  else if (fromUnit === 'kpa') psi = value * PSI_PER_KPA;
+  if (toUnit === 'bar') return psi / PSI_PER_BAR;
+  if (toUnit === 'kpa') return psi / PSI_PER_KPA;
+  return psi;
+}
+let currentTyreUnit = 'psi';
+
+/* Apply a tyre-pressure unit to the form. When convert=true, the four input
+   values are converted from the previous unit; when false, they're left as
+   they are (used when restoring a saved session that was stored in that
+   unit). Updates step + placeholder on each input and the dropdown value. */
+function setTyreUnit(unit, opts) {
+  opts = opts || {};
+  if (!TYRE_UNITS[unit]) unit = 'psi';
+  const oldUnit = currentTyreUnit;
+  const cfg = TYRE_UNITS[unit];
+  const sel = document.getElementById('tyreUnitSelect');
+  if (sel) sel.value = unit;
+  ['tyreFL', 'tyreFR', 'tyreRL', 'tyreRR'].forEach(name => {
+    const input = document.querySelector(`input[name="${name}"]`);
+    if (!input) return;
+    input.step = cfg.step;
+    input.placeholder = cfg.placeholder;
+    if (opts.convert && input.value !== '' && oldUnit !== unit) {
+      const num = parseFloat(input.value);
+      if (!isNaN(num)) {
+        input.value = convertTyreValue(num, oldUnit, unit).toFixed(cfg.decimals);
+      }
+    }
+  });
+  currentTyreUnit = unit;
+}
+
+function wireTyreUnit() {
+  const sel = document.getElementById('tyreUnitSelect');
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    setTyreUnit(sel.value, { convert: true });
+    settings.tyreUnit = sel.value;
+    save();
+  });
+  setTyreUnit(settings.tyreUnit || 'psi', { convert: false });
+}
+
+/* Render four-corner tyre pressures as "FL/FR · RL/RR UNIT", or "—" if none set.
+   Legacy sessions without a stored unit are assumed to be PSI. */
 function tyrePressureSummary(s) {
   const vals = [s.tyreFL, s.tyreFR, s.tyreRL, s.tyreRR];
   if (!vals.some(v => v != null && v !== '')) return '—';
   const fmt = v => (v == null || v === '') ? '?' : v;
-  return `${fmt(vals[0])}/${fmt(vals[1])} · ${fmt(vals[2])}/${fmt(vals[3])}`;
+  const unitCfg = TYRE_UNITS[s.tyreUnit] || TYRE_UNITS.psi;
+  return `${fmt(vals[0])}/${fmt(vals[1])} · ${fmt(vals[2])}/${fmt(vals[3])} ${unitCfg.label}`;
 }
 function setupLine(s) {
   const p = [];
@@ -1423,8 +1493,11 @@ function fillForm(s) {
     updateAxleOptionsForBrand(s.chassisBrand);
     updateTorsionBarVisibility(s.chassisBrand);
   }
+  // Restore the tyre-pressure unit the session was stored in BEFORE setting
+  // the tyre values, so step/placeholder match and no conversion happens.
+  setTyreUnit(s.tyreUnit || 'psi', { convert: false });
   Object.entries(s).forEach(([k, v]) => {
-    if (k === 'chassisBrand') return;
+    if (k === 'chassisBrand' || k === 'tyreUnit') return;
     if (form.elements[k] && v != null) form.elements[k].value = v;
   });
   updateChassisVisibility();
@@ -1671,6 +1744,7 @@ window.goLogWithToday = function () {
 document.getElementById('logForm').addEventListener('submit', e => {
   e.preventDefault();
   const s = formToSession(e.target);
+  s.tyreUnit = currentTyreUnit;
   if (editingId) {
     const i = sessions.findIndex(x => x.id === editingId);
     sessions[i] = { ...sessions[i], ...s, id: editingId };
@@ -1683,6 +1757,8 @@ document.getElementById('logForm').addEventListener('submit', e => {
   editingId = null; document.getElementById('editingNote').style.display = 'none';
   save(); renderHistory(); e.target.reset();
   updateChassisVisibility();
+  // form.reset() pulls the unit selector back to PSI — restore the user's choice.
+  setTyreUnit(settings.tyreUnit || 'psi', { convert: false });
   showView('history');
 });
 
@@ -1802,6 +1878,7 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
   document.getElementById('chassisBrand').addEventListener('change', updateChassisVisibility);
   updateChassisVisibility();
   wireRearTrackSeed();
+  wireTyreUnit();
   renderHistory();
   if (settings.location) {
     document.getElementById('circuitLabel').textContent = settings.location.name || '— Select a circuit —';
