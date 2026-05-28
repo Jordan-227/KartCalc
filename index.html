@@ -342,7 +342,17 @@
               <div class="circuit-menu" id="logTrackMenu" hidden></div>
             </div>
           </div>
-          <div class="field"><label>Class / Kart</label><input name="kart" placeholder="e.g. Rotax Senior"></div>
+          <div class="field"><label>Category</label>
+            <select name="category">
+              <option value="">— Select category —</option>
+              <option>TaG Restricted Light</option>
+              <option>TaG 125</option>
+              <option>X30</option>
+              <option>KA3 Junior Light</option>
+              <option>KA3 Junior Heavy</option>
+              <option>KA3 Senior</option>
+            </select>
+          </div>
         </div>
         <datalist id="trackList"></datalist>
       </div>
@@ -1351,7 +1361,7 @@ function renderHistory() {
   const body = document.getElementById('historyBody');
   const rows = sessions
     .slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt)
-    .filter(s => !filter || [s.track, s.date, s.weather, s.kart, s.feel].join(' ').toLowerCase().includes(filter));
+    .filter(s => !filter || [s.track, s.date, s.weather, s.category, s.feel].join(' ').toLowerCase().includes(filter));
 
   document.getElementById('sessionCount').textContent = `${sessions.length} session${sessions.length === 1 ? '' : 's'}`;
   document.getElementById('historyEmpty').style.display = sessions.length ? 'none' : 'block';
@@ -1677,6 +1687,11 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
       if (s.tyreRL == null) s.tyreRL = s.tyreRear;
       if (s.tyreRR == null) s.tyreRR = s.tyreRear;
       delete s.tyreRear;
+      migrated = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(s, 'kart')) {
+      if (s.category == null) s.category = s.kart;
+      delete s.kart;
       migrated = true;
     }
   });
