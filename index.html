@@ -128,12 +128,9 @@
   .circuit-country {
     padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 14px;
     display: flex; justify-content: space-between; align-items: center;
-    color: var(--text); user-select: none; gap: 8px;
+    color: var(--text); user-select: none;
   }
-  .circuit-country .row-left { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1; }
   .circuit-country:hover { background: var(--panel); }
-  .circuit-country.fav { background: rgba(255,209,74,0.06); }
-  .circuit-country.fav:hover { background: rgba(255,209,74,0.10); }
   .circuit-country .arrow { color: var(--muted); transition: transform .15s ease; font-size: 12px; }
   .circuit-country.open .arrow { transform: rotate(90deg); }
   .circuit-country .count { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
@@ -498,8 +495,7 @@ const LS_SESSIONS = 'kartcalc.sessions';
 const LS_SETTINGS = 'kartcalc.settings';
 
 let sessions = load(LS_SESSIONS, []);
-let settings = load(LS_SETTINGS, { location: null, lastWeather: null, favCountries: [], favTracks: [] });
-if (!Array.isArray(settings.favCountries)) settings.favCountries = [];
+let settings = load(LS_SETTINGS, { location: null, lastWeather: null, favTracks: [] });
 if (!Array.isArray(settings.favTracks)) settings.favTracks = [];
 let editingId = null;
 
@@ -807,14 +803,8 @@ const COUNTRY_NAMES = {
   NZ: 'New Zealand',
 };
 
-/* Favourites — countries by cc, tracks by name (stable across rebuilds). */
-function isFavCountry(cc) { return settings.favCountries.includes(cc); }
+/* Track favourites — by name, stable across rebuilds. */
 function isFavTrack(name) { return settings.favTracks.includes(name); }
-function toggleFavCountry(cc) {
-  const i = settings.favCountries.indexOf(cc);
-  if (i >= 0) settings.favCountries.splice(i, 1); else settings.favCountries.push(cc);
-  save();
-}
 function toggleFavTrack(name) {
   const i = settings.favTracks.indexOf(name);
   if (i >= 0) settings.favTracks.splice(i, 1); else settings.favTracks.push(name);
@@ -822,8 +812,8 @@ function toggleFavTrack(name) {
 }
 
 /* The dashboard "Circuit / town" dropdown — countries expand to show tracks.
-   Favourited countries pin to the top; favourited tracks pin to the top within
-   each country AND surface in a "★ Favourites" section at the very top. */
+   Favourited tracks pin to the top within each country AND surface in a
+   "★ Favourites" section at the very top. Countries themselves sort alpha. */
 function populateCircuitDropdown() {
   const menu = document.getElementById('circuitMenu');
   if (!menu) return;
@@ -837,11 +827,7 @@ function populateCircuitDropdown() {
     byCountry.get(t.cc).push({ ...t, _i: i });
   });
 
-  // Countries: favourites first (alpha within), then rest alpha.
   const entries = [...byCountry.entries()].sort((a, b) => {
-    const fa = isFavCountry(a[0]);
-    const fb = isFavCountry(b[0]);
-    if (fa !== fb) return fa ? -1 : 1;
     const na = COUNTRY_NAMES[a[0]] || a[0];
     const nb = COUNTRY_NAMES[b[0]] || b[0];
     return na.localeCompare(nb);
@@ -877,13 +863,9 @@ function populateCircuitDropdown() {
         + `<span class="track-name">${escapeHtml(t.name)}<span class="town">${escapeHtml(t.town)}</span></span>`
         + `</div>`;
     }).join('');
-    const favCountry = isFavCountry(cc);
     const isOpen = openCcs.has(cc);
-    return `<div class="circuit-country ${favCountry ? 'fav' : ''} ${isOpen ? 'open' : ''}" data-cc="${escapeHtml(cc)}">`
-      + `<span class="row-left">`
-      + `<span class="fav-star ${favCountry ? 'on' : ''}" data-fav-cc="${escapeAttr(cc)}" title="${favCountry ? 'Remove country from favourites' : 'Add country to favourites'}">${favCountry ? '★' : '☆'}</span>`
-      + `<span class="country-name">${escapeHtml(countryName)}<span class="count">${tracks.length}</span></span>`
-      + `</span>`
+    return `<div class="circuit-country ${isOpen ? 'open' : ''}" data-cc="${escapeHtml(cc)}">`
+      + `<span>${escapeHtml(countryName)}<span class="count">${tracks.length}</span></span>`
       + `<span class="arrow">▸</span>`
       + `</div>`
       + `<div class="circuit-tracks ${isOpen ? 'open' : ''}" data-cc="${escapeHtml(cc)}">${tracksHtml}</div>`;
@@ -1367,12 +1349,11 @@ function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
     if (!dd.contains(e.target)) setOpen(false);
   });
   menu.addEventListener('click', e => {
-    // Star click — toggle favourite without expanding country or selecting track.
+    // Star click — toggle track favourite without selecting the track.
     const star = e.target.closest('.fav-star');
-    if (star) {
+    if (star && star.dataset.favTrack) {
       e.stopPropagation();
-      if (star.dataset.favCc) toggleFavCountry(star.dataset.favCc);
-      else if (star.dataset.favTrack) toggleFavTrack(star.dataset.favTrack);
+      toggleFavTrack(star.dataset.favTrack);
       populateCircuitDropdown();
       return;
     }
